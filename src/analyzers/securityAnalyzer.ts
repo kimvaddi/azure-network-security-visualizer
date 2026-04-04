@@ -20,6 +20,7 @@ import {
   RouteTable,
   AzureFirewall,
   PrivateEndpoint,
+  ApplicationGateway,
 } from '../models/networkModel';
 
 // ─── Rule IDs ───────────────────────────────────────────────────────────────
@@ -42,6 +43,10 @@ export const RULE_IDS = {
   VNET_NO_DDOS: 'NETSEC-015',
   NO_BASTION_SUBNET: 'NETSEC-016',
   PE_NO_DNS_ZONE: 'NETSEC-017',
+  APPGW_NO_WAF: 'NETSEC-018',
+  APPGW_WAF_DETECTION_ONLY: 'NETSEC-019',
+  APPGW_WEAK_TLS: 'NETSEC-020',
+  SUBNET_NO_UDR: 'NETSEC-021',
 } as const;
 
 // ─── Analyzer ───────────────────────────────────────────────────────────────
@@ -77,6 +82,16 @@ export function analyzeTopology(topology: NetworkTopology): SecurityFinding[] {
   // Zero Trust: Analyze Private Endpoints for DNS zones
   for (const pe of topology.privateEndpoints) {
     findings.push(...analyzePrivateEndpointDns(pe));
+  }
+
+  // Zero Trust: Analyze Application Gateways for WAF + TLS
+  for (const appgw of (topology.applicationGateways ?? [])) {
+    findings.push(...analyzeApplicationGateway(appgw));
+  }
+
+  // Zero Trust: Analyze subnets for forced tunneling (UDR)
+  for (const vnet of topology.vnets) {
+    findings.push(...analyzeSubnetRouting(vnet, topology));
   }
 
   // Sort by severity
@@ -422,6 +437,97 @@ function analyzePrivateEndpointDns(pe: PrivateEndpoint): SecurityFinding[] {
       line: pe.sourceLocation?.line,
       filePath: pe.sourceLocation?.filePath,
     });
+  }
+
+  return findings;
+}
+
+// ─── Zero Trust: Application Gateway Analysis (WAF + TLS) ──────────────────
+
+function analyzeApplicationGateway(appgw: ApplicationGateway): SecurityFinding[] {
+  const findings: SecurityFinding[] = [];
+
+  // NETSEC-018: Application Gateway without WAF
+  if (!appgw.wafEnabled) {
+    findings.push({
+      id: RULE_IDS.APPGW_NO_WAF,
+      severity: 'high',
+      title: `Application Gateway "${appgw.name}" does not have WAF enabled`,
+      description: `Application Gateway "${appgw.name}" (SKU: ${appgw.skuTier}) does not have Web Application Firewall enabled. Internet-facing web applications are unprotected against OWASP Top 10 attacks (SQL injection, XSS, etc.).`,
+      recommendation: 'Upgrade to WAF_v2 SKU and enable WAF in Prevention mode. This is a Zero Trust requirement for all internet-facing web endpoints. Ref: https://learn.microsoft.com/azure/web-application-firewall/ag/ag-overview',
+      learnMoreUrl: 'https://learn.microsoft.com/azure/web-application-firewall/ag/ag-overview',
+      resourceId: appgw.id,
+      resourceType: 'Microsoft.Network/applicationGateways',
+      resourceName: appgw.name,
+      line: appgw.sourceLocation?.line,
+      filePath: appgw.sourceLocation?.filePath,
+    });
+  }
+
+  // NETSEC-019: WAF in Detection mode only
+  if (appgw.wafEnabled && appgw.wafMode === 'Detection') {
+    findings.push({
+      id: RULE_IDS.APPGW_WAF_DETECTION_ONLY,
+      severity: 'warning',
+      title: `WAF on "${appgw.name}" is in Detection mode — not blocking attacks`,
+      description: `Application Gateway "${appgw.name}" has WAF enabled but in Detection mode. Attacks are logged but NOT blocked. Traffic still reaches your application.`,
+      recommendation: 'Switch WAF to Prevention mode to actively block malicious requests. Detection mode should only be used during initial tuning. Ref: https://learn.microsoft.com/azure/web-application-firewall/ag/ag-overview#waf-modes',
+      learnMoreUrl: 'https://learn.microsoft.com/azure/web-application-firewall/ag/ag-overview',
+      resourceId: appgw.id,
+      resourceType: 'Microsoft.Network/applicationGateways',
+      resourceName: appgw.name,
+      line: appgw.sourceLocation?.line,
+      filePath: appgw.sourceLocation?.filePath,
+    });
+  }
+
+  // NETSEC-020: Weak TLS version
+  if (appgw.minProtocolVersion && !appgw.minProtocolVersion.includes('1_2') && !appgw.minProtocolVersion.includes('1_3')) {
+    findings.push({
+      id: RULE_IDS.APPGW_WEAK_TLS,
+      severity: 'high',
+      title: `Application Gateway "${appgw.name}" allows TLS versions below 1.2`,
+      description: `Application Gateway "${appgw.name}" has minProtocolVersion set to "${appgw.minProtocolVersion}". TLS 1.0 and 1.1 are deprecated and have known vulnerabilities.`,
+      recommendation: 'Set minProtocolVersion to TLSv1_2 or higher. Zero Trust requires end-to-end encryption with modern TLS. Ref: https://learn.microsoft.com/azure/application-gateway/application-gateway-ssl-policy-overview',
+      learnMoreUrl: 'https://learn.microsoft.com/azure/application-gateway/application-gateway-ssl-policy-overview',
+      resourceId: appgw.id,
+      resourceType: 'Microsoft.Network/applicationGateways',
+      resourceName: appgw.name,
+      line: appgw.sourceLocation?.line,
+      filePath: appgw.sourceLocation?.filePath,
+    });
+  }
+
+  return findings;
+}
+
+// ─── Zero Trust: Subnet Routing Analysis (Forced Tunneling) ─────────────────
+
+function analyzeSubnetRouting(vnet: VirtualNetwork, topology: NetworkTopology): SecurityFinding[] {
+  const findings: SecurityFinding[] = [];
+  const skipSubnets = ['AzureBastionSubnet', 'GatewaySubnet', 'AzureFirewallSubnet', 'AzureFirewallManagementSubnet', 'RouteServerSubnet'];
+
+  for (const subnet of vnet.subnets) {
+    if (skipSubnets.some(s => subnet.name.toLowerCase().includes(s.toLowerCase()))) {
+      continue;
+    }
+
+    // NETSEC-021: Subnet without route table (no forced tunneling)
+    if (!subnet.routeTableId && topology.firewalls.length > 0) {
+      findings.push({
+        id: RULE_IDS.SUBNET_NO_UDR,
+        severity: 'warning',
+        title: `Subnet "${subnet.name}" has no route table — traffic may bypass firewall`,
+        description: `Subnet "${subnet.name}" in VNet "${vnet.name}" does not have a User Defined Route (UDR) associated. Since Azure Firewall exists in the topology, this subnet's traffic may bypass firewall inspection.`,
+        recommendation: 'Associate a route table with a 0.0.0.0/0 route pointing to the Azure Firewall private IP for forced tunneling. This ensures all outbound traffic is inspected. Ref: https://learn.microsoft.com/azure/firewall/forced-tunneling',
+        learnMoreUrl: 'https://learn.microsoft.com/azure/firewall/forced-tunneling',
+        resourceId: subnet.id,
+        resourceType: 'Microsoft.Network/virtualNetworks/subnets',
+        resourceName: subnet.name,
+        line: subnet.sourceLocation?.line,
+        filePath: subnet.sourceLocation?.filePath,
+      });
+    }
   }
 
   return findings;

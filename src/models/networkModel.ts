@@ -169,6 +169,30 @@ export interface AzureFirewall {
   sourceLocation?: { filePath: string; line: number };
 }
 
+// ─── Application Gateway ────────────────────────────────────────────────────
+
+export interface ApplicationGateway {
+  id: string;
+  name: string;
+  skuTier: 'Standard_v2' | 'WAF_v2' | 'Standard' | 'WAF' | string;
+  /** Whether WAF is enabled */
+  wafEnabled?: boolean;
+  /** WAF mode: Detection or Prevention */
+  wafMode?: 'Detection' | 'Prevention' | string;
+  /** Minimum TLS version (e.g., 'TLSv1_2') */
+  minProtocolVersion?: string;
+  sourceLocation?: { filePath: string; line: number };
+}
+
+// ─── Azure Bastion Host ─────────────────────────────────────────────────────
+
+export interface BastionHost {
+  id: string;
+  name: string;
+  skuName?: 'Basic' | 'Standard' | 'Developer' | string;
+  sourceLocation?: { filePath: string; line: number };
+}
+
 // ─── Network Topology (Aggregate) ───────────────────────────────────────────
 
 export interface NetworkTopology {
@@ -177,6 +201,10 @@ export interface NetworkTopology {
   routeTables: RouteTable[];
   privateEndpoints: PrivateEndpoint[];
   firewalls: AzureFirewall[];
+  /** Application Gateways (WAF, L7 routing) */
+  applicationGateways: ApplicationGateway[];
+  /** Azure Bastion hosts */
+  bastionHosts: BastionHost[];
   /** Cross-references resolved after parsing */
   connections: TopologyConnection[];
 }

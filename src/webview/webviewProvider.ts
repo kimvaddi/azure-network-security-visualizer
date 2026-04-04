@@ -1051,6 +1051,10 @@ export class TopologyWebviewProvider {
       'NETSEC-015': { action: '🟠 REVIEW', guidance: 'Enable Azure DDoS Protection on this VNet. Required for Zero Trust.', safe: false },
       'NETSEC-016': { action: '🟡 IMPROVE', guidance: 'Add AzureBastionSubnet and deploy Bastion for secure VM access without open ports.', safe: true },
       'NETSEC-017': { action: '🟡 IMPROVE', guidance: 'Add Private DNS Zone Group so DNS resolves to the private IP, not public.', safe: true },
+      'NETSEC-018': { action: '🟠 REVIEW', guidance: 'Enable WAF (WAF_v2 SKU) on this Application Gateway. Required for Zero Trust.', safe: false },
+      'NETSEC-019': { action: '🟡 IMPROVE', guidance: 'Switch WAF from Detection to Prevention mode to actively block attacks.', safe: false },
+      'NETSEC-020': { action: '🔴 FIX NOW', guidance: 'Set minProtocolVersion to TLSv1_2. TLS 1.0/1.1 are deprecated.', safe: false },
+      'NETSEC-021': { action: '🟡 IMPROVE', guidance: 'Add route table with 0.0.0.0/0 → Firewall for forced tunneling.', safe: false },
     };
 
     function renderActionGroups() {

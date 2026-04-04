@@ -22,6 +22,8 @@ import {
   PrivateEndpoint,
   AzureFirewall,
   VNetPeering,
+  ApplicationGateway,
+  BastionHost,
   RuleDirection,
   RuleAccess,
   RuleProtocol,
@@ -37,7 +39,9 @@ Resources
     'microsoft.network/networksecuritygroups',
     'microsoft.network/routetables',
     'microsoft.network/privateendpoints',
-    'microsoft.network/azurefirewalls'
+    'microsoft.network/azurefirewalls',
+    'microsoft.network/applicationgateways',
+    'microsoft.network/bastionhosts'
   )
 | project id, name, type, location, resourceGroup, subscriptionId, properties, tags
 | order by type asc, name asc
@@ -141,6 +145,8 @@ function mapResourcesToTopology(resources: ResourceGraphRow[], peeringRows: Peer
   const routeTables: RouteTable[] = [];
   const privateEndpoints: PrivateEndpoint[] = [];
   const firewalls: AzureFirewall[] = [];
+  const applicationGateways: ApplicationGateway[] = [];
+  const bastionHosts: BastionHost[] = [];
 
   for (const r of resources) {
     try {
@@ -156,13 +162,17 @@ function mapResourcesToTopology(resources: ResourceGraphRow[], peeringRows: Peer
         privateEndpoints.push(mapPrivateEndpoint(r));
       } else if (typeLower === 'microsoft.network/azurefirewalls') {
         firewalls.push(mapFirewall(r));
+      } else if (typeLower === 'microsoft.network/applicationgateways') {
+        applicationGateways.push(mapAppGateway(r));
+      } else if (typeLower === 'microsoft.network/bastionhosts') {
+        bastionHosts.push(mapBastionHost(r));
       }
     } catch {
       // Skip malformed resources
     }
   }
 
-  return { vnets, nsgs, routeTables, privateEndpoints, firewalls, connections: [] };
+  return { vnets, nsgs, routeTables, privateEndpoints, firewalls, applicationGateways, bastionHosts, connections: [] };
 }
 
 // ─── Safe Property Helpers ──────────────────────────────────────────────────
@@ -328,6 +338,45 @@ function mapFirewall(r: ResourceGraphRow): AzureFirewall {
     threatIntelMode: threatIntelMode || 'Alert',
     rules: [],
     firewallPolicyId: policyRef?.id,
+    sourceLocation: { filePath: `azure://${r.subscriptionId}/${r.resourceGroup}/${r.name}`, line: 0 },
+  };
+}
+
+// ─── Application Gateway Mapping ────────────────────────────────────────────
+
+function mapAppGateway(r: ResourceGraphRow): ApplicationGateway {
+  const props = r.properties;
+  const sku = prop<{ tier: string }>(props, 'sku');
+  const wafConfig = prop<Record<string, unknown>>(props, 'webApplicationFirewallConfiguration');
+  const sslPolicy = prop<Record<string, unknown>>(props, 'sslPolicy');
+
+  const skuTier = (sku?.tier ?? 'Standard_v2') as ApplicationGateway['skuTier'];
+  const isWafSku = skuTier.toLowerCase().includes('waf');
+  const wafEnabled = wafConfig ? (prop<boolean>(wafConfig, 'enabled') ?? isWafSku) : isWafSku;
+  const wafMode = wafConfig ? strProp(wafConfig, 'firewallMode') : undefined;
+  const minProtocolVersion = sslPolicy ? strProp(sslPolicy, 'minProtocolVersion') : undefined;
+
+  return {
+    id: r.id,
+    name: r.name,
+    skuTier,
+    wafEnabled,
+    wafMode: wafMode as ApplicationGateway['wafMode'],
+    minProtocolVersion: minProtocolVersion || undefined,
+    sourceLocation: { filePath: `azure://${r.subscriptionId}/${r.resourceGroup}/${r.name}`, line: 0 },
+  };
+}
+
+// ─── Bastion Host Mapping ───────────────────────────────────────────────────
+
+function mapBastionHost(r: ResourceGraphRow): BastionHost {
+  const props = r.properties;
+  const sku = prop<{ name: string }>(props, 'sku');
+
+  return {
+    id: r.id,
+    name: r.name,
+    skuName: (sku?.name ?? 'Standard') as BastionHost['skuName'],
     sourceLocation: { filePath: `azure://${r.subscriptionId}/${r.resourceGroup}/${r.name}`, line: 0 },
   };
 }

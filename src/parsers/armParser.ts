@@ -20,6 +20,8 @@ import {
   PrivateEndpoint,
   AzureFirewall,
   FirewallRule,
+  ApplicationGateway,
+  BastionHost,
   RuleDirection,
   RuleAccess,
   RuleProtocol,
@@ -75,6 +77,8 @@ export function parseArmTemplate(content: string, options: ArmParseOptions): Par
   const routeTables: RouteTable[] = [];
   const privateEndpoints: PrivateEndpoint[] = [];
   const firewalls: AzureFirewall[] = [];
+  const applicationGateways: ApplicationGateway[] = [];
+  const bastionHosts: BastionHost[] = [];
 
   const allResources = flattenResources(template.resources ?? []);
 
@@ -92,6 +96,10 @@ export function parseArmTemplate(content: string, options: ArmParseOptions): Par
       privateEndpoints.push(parseArmPrivateEndpoint(resource, options.filePath, line));
     } else if (typeLower === 'microsoft.network/azurefirewalls') {
       firewalls.push(parseArmFirewall(resource, options.filePath, line));
+    } else if (typeLower === 'microsoft.network/applicationgateways') {
+      applicationGateways.push(parseArmAppGateway(resource, options.filePath, line));
+    } else if (typeLower === 'microsoft.network/bastionhosts') {
+      bastionHosts.push(parseArmBastionHost(resource, options.filePath, line));
     }
   }
 
@@ -101,6 +109,8 @@ export function parseArmTemplate(content: string, options: ArmParseOptions): Par
     routeTables,
     privateEndpoints,
     firewalls,
+    applicationGateways,
+    bastionHosts,
     connections: [],
   };
 }
@@ -311,6 +321,45 @@ function parseArmFirewall(resource: ArmResource, filePath: string, line: number)
     threatIntelMode: threatIntelMode || 'Alert',
     rules: [],
     firewallPolicyId: policyRef?.id,
+    sourceLocation: { filePath, line },
+  };
+}
+
+// ─── Application Gateway Parser ─────────────────────────────────────────────
+
+function parseArmAppGateway(resource: ArmResource, filePath: string, line: number): ApplicationGateway {
+  const props = resource.properties ?? {};
+  const sku = getProp<{ tier: string }>(props, 'sku');
+  const wafConfig = getProp<Record<string, unknown>>(props, 'webApplicationFirewallConfiguration');
+  const sslPolicy = getProp<Record<string, unknown>>(props, 'sslPolicy');
+
+  const skuTier = (sku?.tier ?? 'Standard_v2') as ApplicationGateway['skuTier'];
+  const isWafSku = skuTier.toLowerCase().includes('waf');
+  const wafEnabled = wafConfig ? (getProp<boolean>(wafConfig, 'enabled') ?? isWafSku) : isWafSku;
+  const wafMode = wafConfig ? getStringProp(wafConfig, 'firewallMode') : undefined;
+  const minProtocolVersion = sslPolicy ? getStringProp(sslPolicy, 'minProtocolVersion') : undefined;
+
+  return {
+    id: resource.name,
+    name: resource.name,
+    skuTier,
+    wafEnabled,
+    wafMode: wafMode as ApplicationGateway['wafMode'],
+    minProtocolVersion: minProtocolVersion || undefined,
+    sourceLocation: { filePath, line },
+  };
+}
+
+// ─── Bastion Host Parser ────────────────────────────────────────────────────
+
+function parseArmBastionHost(resource: ArmResource, filePath: string, line: number): BastionHost {
+  const props = resource.properties ?? {};
+  const sku = getProp<{ name: string }>(props, 'sku');
+
+  return {
+    id: resource.name,
+    name: resource.name,
+    skuName: (sku?.name ?? 'Standard') as BastionHost['skuName'],
     sourceLocation: { filePath, line },
   };
 }

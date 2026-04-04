@@ -21,6 +21,8 @@ import {
   AzureFirewall,
   FirewallRule,
   VNetPeering,
+  ApplicationGateway,
+  BastionHost,
   RuleDirection,
   RuleAccess,
   RuleProtocol,
@@ -41,6 +43,8 @@ const RESOURCE_TYPES = {
   firewall: 'Microsoft.Network/azureFirewalls',
   firewallPolicy: 'Microsoft.Network/firewallPolicies',
   peering: 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings',
+  applicationGateway: 'Microsoft.Network/applicationGateways',
+  bastionHost: 'Microsoft.Network/bastionHosts',
 } as const;
 
 // ─── Parser ─────────────────────────────────────────────────────────────────
@@ -55,6 +59,8 @@ export function parseBicepFile(content: string, options: BicepParseOptions): Par
   const routeTables: RouteTable[] = [];
   const privateEndpoints: PrivateEndpoint[] = [];
   const firewalls: AzureFirewall[] = [];
+  const applicationGateways: ApplicationGateway[] = [];
+  const bastionHosts: BastionHost[] = [];
   const peerings: Array<{ vnetName: string; peering: VNetPeering }> = [];
 
   const resources = extractResources(content, options.filePath);
@@ -79,6 +85,12 @@ export function parseBicepFile(content: string, options: BicepParseOptions): Par
       case RESOURCE_TYPES.peering:
         peerings.push(parsePeering(res));
         break;
+      case RESOURCE_TYPES.applicationGateway:
+        applicationGateways.push(parseApplicationGateway(res));
+        break;
+      case RESOURCE_TYPES.bastionHost:
+        bastionHosts.push(parseBastionHost(res));
+        break;
     }
   }
 
@@ -96,6 +108,8 @@ export function parseBicepFile(content: string, options: BicepParseOptions): Par
     routeTables,
     privateEndpoints,
     firewalls,
+    applicationGateways,
+    bastionHosts,
     connections: [],
   };
 }
@@ -415,6 +429,41 @@ function parseFirewall(res: RawResource): AzureFirewall {
     threatIntelMode,
     rules: [],
     firewallPolicyId,
+    sourceLocation: { filePath: res.filePath, line: res.line },
+  };
+}
+
+// ─── Application Gateway Parser ─────────────────────────────────────────────
+
+function parseApplicationGateway(res: RawResource): ApplicationGateway {
+  const name = extractStringProperty(res.body, 'name') ?? res.symbolicName;
+  const skuTier = extractStringProperty(res.body, 'tier') ?? 'Standard_v2';
+  const wafEnabled = extractBoolProperty(res.body, 'enabled');
+  const wafMode = extractStringProperty(res.body, 'firewallMode');
+  const minProtocolVersion = extractStringProperty(res.body, 'minProtocolVersion');
+  const isWafSku = skuTier.toLowerCase().includes('waf');
+
+  return {
+    id: res.symbolicName,
+    name,
+    skuTier,
+    wafEnabled: wafEnabled || isWafSku,
+    wafMode: wafMode as ApplicationGateway['wafMode'],
+    minProtocolVersion,
+    sourceLocation: { filePath: res.filePath, line: res.line },
+  };
+}
+
+// ─── Bastion Host Parser ────────────────────────────────────────────────────
+
+function parseBastionHost(res: RawResource): BastionHost {
+  const name = extractStringProperty(res.body, 'name') ?? res.symbolicName;
+  const skuName = extractStringProperty(res.body, 'name') ?? 'Standard';
+
+  return {
+    id: res.symbolicName,
+    name,
+    skuName: skuName as BastionHost['skuName'],
     sourceLocation: { filePath: res.filePath, line: res.line },
   };
 }
