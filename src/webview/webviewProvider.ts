@@ -61,6 +61,9 @@ export class TopologyWebviewProvider {
         case 'exportReport':
           vscode.commands.executeCommand('azureNetSec.exportReport');
           break;
+        case 'generateMermaid':
+          this.generateMermaidDiagram(topology, findings);
+          break;
       }
     });
   }
@@ -102,6 +105,97 @@ export class TopologyWebviewProvider {
     }
   }
 
+  private async generateMermaidDiagram(topology: NetworkTopology, findings: SecurityFinding[]): Promise<void> {
+    const lines: string[] = ['graph TB'];
+    const sanitize = (s: string) => s.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+    // VNets and subnets
+    topology.vnets.forEach(vnet => {
+      const vid = sanitize(vnet.name);
+      lines.push(`  subgraph ${vid}["🌐 ${vnet.name}<br/>${vnet.addressSpace.join(', ')}"]`);
+      lines.push(`    direction TB`);
+      vnet.subnets.forEach(subnet => {
+        const sid = sanitize(subnet.name);
+        const hasIssue = findings.some(f => f.resourceName === subnet.name);
+        const style = hasIssue ? ':::danger' : '';
+        lines.push(`    ${sid}["📦 ${subnet.name}<br/>${subnet.addressPrefix}"]${style}`);
+      });
+      lines.push(`  end`);
+    });
+
+    // NSGs
+    topology.nsgs.forEach(nsg => {
+      const nid = sanitize(nsg.name);
+      lines.push(`  ${nid}["🛡️ ${nsg.name}<br/>${nsg.rules.length} rules"]:::nsg`);
+    });
+
+    // Firewalls
+    topology.firewalls.forEach(fw => {
+      const fid = sanitize(fw.name);
+      lines.push(`  ${fid}["🔥 ${fw.name}<br/>SKU: ${fw.skuTier}"]:::firewall`);
+    });
+
+    // Private Endpoints
+    topology.privateEndpoints.forEach(pe => {
+      const pid = sanitize(pe.name);
+      lines.push(`  ${pid}["🔒 ${pe.name}<br/>${pe.groupIds.join(', ')}"]:::pe`);
+    });
+
+    // Connections
+    topology.connections.forEach(conn => {
+      const src = sanitize(conn.sourceId);
+      const tgt = sanitize(conn.targetId);
+      const label = conn.label ? `|${conn.label}|` : '';
+
+      switch (conn.connectionType) {
+        case 'subnet-nsg':
+          lines.push(`  ${src} -.->${label} ${tgt}`);
+          break;
+        case 'peering':
+          lines.push(`  ${src} <==>${label} ${tgt}`);
+          break;
+        case 'private-endpoint':
+          lines.push(`  ${src} --->${label} ${tgt}`);
+          break;
+        default:
+          lines.push(`  ${src} -->${label} ${tgt}`);
+      }
+    });
+
+    // Peerings as explicit connections
+    topology.vnets.forEach(vnet => {
+      vnet.peerings.forEach(p => {
+        const src = sanitize(vnet.name);
+        const tgt = sanitize(p.remoteVNetId);
+        lines.push(`  ${src} <==>|"${p.name}"| ${tgt}`);
+      });
+    });
+
+    // Styles
+    lines.push('');
+    lines.push('  classDef danger fill:#fecaca,stroke:#ef4444,stroke-width:2px,color:#991b1b');
+    lines.push('  classDef nsg fill:#fed7aa,stroke:#f97316,stroke-width:2px,color:#9a3412');
+    lines.push('  classDef firewall fill:#fecaca,stroke:#ef4444,stroke-width:2px,color:#991b1b');
+    lines.push('  classDef pe fill:#ddd6fe,stroke:#8b5cf6,stroke-width:2px,color:#5b21b6');
+
+    const mermaidContent = lines.join('\n');
+
+    // Open as a new unsaved document
+    const doc = await vscode.workspace.openTextDocument({
+      content: mermaidContent,
+      language: 'mermaid',
+    });
+    vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
+    vscode.window.showInformationMessage(
+      'Mermaid diagram generated. Install the "Mermaid Preview" extension to render it visually.',
+      'Copy to Clipboard'
+    ).then(action => {
+      if (action === 'Copy to Clipboard') {
+        vscode.env.clipboard.writeText(mermaidContent);
+      }
+    });
+  }
+
   private showFindingDetail(findingId: string, findings: SecurityFinding[]): void {
     const finding = findings.find(f => f.id === findingId);
     if (finding) {
@@ -141,18 +235,28 @@ export class TopologyWebviewProvider {
     :root {
       --bg-primary: var(--vscode-editor-background);
       --bg-secondary: var(--vscode-sideBar-background);
+      --bg-elevated: var(--vscode-editorWidget-background, var(--bg-secondary));
       --fg-primary: var(--vscode-editor-foreground);
       --fg-secondary: var(--vscode-descriptionForeground);
       --border: var(--vscode-panel-border);
       --accent: var(--vscode-focusBorder);
-      --critical: #e74c3c;
-      --high: #e67e22;
-      --warning: #f39c12;
-      --info: #3498db;
-      --success: #2ecc71;
-      --vnet-bg: rgba(59, 130, 246, 0.08);
-      --subnet-bg: rgba(16, 185, 129, 0.08);
-      --nsg-border: #e67e22;
+      --critical: #ef4444;
+      --high: #f97316;
+      --warning: #eab308;
+      --info: #3b82f6;
+      --success: #22c55e;
+      --vnet-gradient: linear-gradient(135deg, rgba(59,130,246,0.12) 0%, rgba(59,130,246,0.04) 100%);
+      --subnet-gradient: linear-gradient(135deg, rgba(16,185,129,0.10) 0%, rgba(16,185,129,0.03) 100%);
+      --nsg-gradient: linear-gradient(135deg, rgba(249,115,22,0.12) 0%, rgba(249,115,22,0.04) 100%);
+      --fw-gradient: linear-gradient(135deg, rgba(239,68,68,0.12) 0%, rgba(239,68,68,0.04) 100%);
+      --pe-gradient: linear-gradient(135deg, rgba(139,92,246,0.12) 0%, rgba(139,92,246,0.04) 100%);
+      --glass: rgba(255,255,255,0.04);
+      --glass-border: rgba(255,255,255,0.08);
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.10);
+      --shadow-lg: 0 8px 30px rgba(0,0,0,0.20), 0 4px 8px rgba(0,0,0,0.12);
+      --shadow-glow-blue: 0 0 20px rgba(59,130,246,0.15);
+      --shadow-glow-red: 0 0 15px rgba(239,68,68,0.20);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -160,7 +264,7 @@ export class TopologyWebviewProvider {
     body {
       background: var(--bg-primary);
       color: var(--fg-primary);
-      font-family: var(--vscode-font-family, 'Segoe UI', sans-serif);
+      font-family: var(--vscode-font-family, 'Segoe UI', system-ui, sans-serif);
       font-size: var(--vscode-font-size, 13px);
       overflow: hidden;
       height: 100vh;
@@ -168,146 +272,330 @@ export class TopologyWebviewProvider {
       flex-direction: column;
     }
 
+    /* ─── Toolbar ─── */
     .toolbar {
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 8px 16px;
-      background: var(--bg-secondary);
+      padding: 10px 20px;
+      background: var(--bg-elevated);
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
+      backdrop-filter: blur(8px);
     }
-
+    .toolbar-title {
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
     .toolbar button {
+      background: var(--glass);
+      color: var(--fg-primary);
+      border: 1px solid var(--glass-border);
+      padding: 5px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 11px;
+      transition: all 0.15s ease;
+      backdrop-filter: blur(4px);
+    }
+    .toolbar button:hover {
       background: var(--vscode-button-background);
       color: var(--vscode-button-foreground);
-      border: none;
-      padding: 4px 12px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 12px;
+      border-color: transparent;
+      box-shadow: var(--shadow-sm);
+      transform: translateY(-1px);
     }
-
-    .toolbar button:hover {
-      background: var(--vscode-button-hoverBackground);
+    .toolbar .export-btn {
+      margin-left: auto;
+      background: linear-gradient(135deg, #0078d4, #005a9e);
+      color: #fff;
+      border: none;
+      font-weight: 600;
+      padding: 6px 16px;
+    }
+    .toolbar .export-btn:hover {
+      background: linear-gradient(135deg, #1a8ae6, #0068b8);
+      box-shadow: 0 0 12px rgba(0,120,212,0.3);
     }
 
     .badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 10px;
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 10px;
+      border-radius: 12px;
       font-size: 11px;
-      font-weight: 600;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      box-shadow: var(--shadow-sm);
     }
-
     .badge.critical { background: var(--critical); color: white; }
     .badge.high { background: var(--high); color: white; }
     .badge.warning { background: var(--warning); color: #1a1a1a; }
     .badge.info { background: var(--info); color: white; }
 
-    .summary {
-      display: flex;
-      gap: 12px;
-      margin-left: auto;
-    }
+    .summary { display: flex; gap: 8px; }
 
-    .main-content {
-      display: flex;
-      flex: 1;
-      overflow: hidden;
-    }
+    .main-content { display: flex; flex: 1; overflow: hidden; }
 
     /* ─── Topology Canvas ─── */
     .topology-canvas {
       flex: 1;
       overflow: auto;
-      padding: 24px;
+      padding: 28px;
       position: relative;
+      background-image:
+        radial-gradient(circle at 1px 1px, rgba(100,100,100,0.08) 1px, transparent 0);
+      background-size: 24px 24px;
     }
 
+    /* ─── VNet Container (3D Card) ─── */
     .vnet-container {
-      border: 2px solid #3b82f6;
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 16px;
-      background: var(--vnet-bg);
+      background: var(--vnet-gradient);
+      border: 1px solid rgba(59,130,246,0.25);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow-md), var(--shadow-glow-blue);
+      backdrop-filter: blur(8px);
+      transform: perspective(1000px) rotateX(1deg);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
     }
-
+    .vnet-container:hover {
+      transform: perspective(1000px) rotateX(0deg) translateY(-2px);
+      box-shadow: var(--shadow-lg), var(--shadow-glow-blue);
+    }
     .vnet-header {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin-bottom: 12px;
+      gap: 10px;
+      margin-bottom: 16px;
       font-size: 14px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .vnet-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      box-shadow: 0 2px 8px rgba(59,130,246,0.3);
+    }
+    .vnet-address {
+      font-size: 11px;
+      color: var(--fg-secondary);
+      font-weight: 400;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      background: var(--glass);
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+    .vnet-location {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(59,130,246,0.15);
+      color: #60a5fa;
       font-weight: 600;
     }
 
-    .vnet-header .icon { font-size: 18px; }
-    .vnet-address { font-size: 11px; color: var(--fg-secondary); font-weight: normal; }
-
+    /* ─── Subnet Cards ─── */
     .subnet-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
       gap: 12px;
     }
-
     .subnet-card {
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px;
-      background: var(--subnet-bg);
+      background: var(--subnet-gradient);
+      border: 1px solid rgba(16,185,129,0.20);
+      border-radius: 12px;
+      padding: 14px;
       cursor: pointer;
-      transition: box-shadow 0.2s;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
     }
-
+    .subnet-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #10b981, #059669);
+      opacity: 0.6;
+      border-radius: 12px 12px 0 0;
+    }
     .subnet-card:hover {
-      box-shadow: 0 0 0 2px var(--accent);
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-md);
+      border-color: rgba(16,185,129,0.4);
     }
-
     .subnet-card.has-issues {
-      border-left: 3px solid var(--critical);
+      border-color: rgba(239,68,68,0.4);
+      box-shadow: var(--shadow-glow-red);
     }
-
+    .subnet-card.has-issues::before {
+      background: linear-gradient(90deg, var(--critical), #dc2626);
+      opacity: 1;
+    }
     .subnet-name {
       font-weight: 600;
       margin-bottom: 4px;
       display: flex;
       align-items: center;
       gap: 6px;
+      font-size: 12px;
     }
-
+    .subnet-icon {
+      width: 22px; height: 22px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px;
+      box-shadow: 0 1px 4px rgba(16,185,129,0.3);
+    }
     .subnet-prefix {
       font-size: 11px;
       color: var(--fg-secondary);
-      font-family: monospace;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
     }
-
-    .subnet-meta {
-      display: flex;
-      gap: 6px;
-      margin-top: 8px;
-      flex-wrap: wrap;
-    }
-
+    .subnet-meta { display: flex; gap: 5px; margin-top: 8px; flex-wrap: wrap; }
     .tag {
+      font-size: 9px;
+      padding: 2px 7px;
+      border-radius: 6px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      backdrop-filter: blur(4px);
+    }
+    .tag.nsg { background: rgba(249,115,22,0.15); color: #fb923c; border: 1px solid rgba(249,115,22,0.25); }
+    .tag.pe { background: rgba(139,92,246,0.15); color: #a78bfa; border: 1px solid rgba(139,92,246,0.25); }
+    .tag.rt { background: rgba(6,182,212,0.15); color: #22d3ee; border: 1px solid rgba(6,182,212,0.25); }
+    .tag.se { background: rgba(59,130,246,0.12); color: #60a5fa; border: 1px solid rgba(59,130,246,0.20); }
+    .severity-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; box-shadow: 0 0 6px currentColor; }
+    .severity-dot.critical { background: var(--critical); color: var(--critical); }
+    .severity-dot.high { background: var(--high); color: var(--high); }
+    .severity-dot.warning { background: var(--warning); color: var(--warning); }
+    .severity-dot.info { background: var(--info); color: var(--info); }
+
+    /* ─── Resource Section Headers ─── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 24px 0 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-header h3 {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .section-count {
       font-size: 10px;
-      padding: 2px 6px;
-      border-radius: 4px;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
+      background: var(--glass);
+      padding: 2px 8px;
+      border-radius: 10px;
+      color: var(--fg-secondary);
     }
 
-    .tag.nsg { border-color: var(--nsg-border); color: var(--nsg-border); }
-    .tag.pe { border-color: #8b5cf6; color: #8b5cf6; }
-    .tag.rt { border-color: #06b6d4; color: #06b6d4; }
+    /* ─── Resource Cards (NSG, Firewall, PE, Peering) ─── */
+    .resource-card {
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 10px;
+      backdrop-filter: blur(8px);
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .resource-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+    .resource-card.nsg-card { background: var(--nsg-gradient); border-color: rgba(249,115,22,0.20); cursor: pointer; }
+    .resource-card.nsg-card::before { content: ''; position: absolute; top:0;left:0;bottom:0;width:3px; background: linear-gradient(180deg, #f97316, #ea580c); }
+    .resource-card.fw-card { background: var(--fw-gradient); border-color: rgba(239,68,68,0.20); }
+    .resource-card.fw-card::before { content: ''; position: absolute; top:0;left:0;bottom:0;width:3px; background: linear-gradient(180deg, #ef4444, #dc2626); }
+    .resource-card.pe-card { background: var(--pe-gradient); border-color: rgba(139,92,246,0.20); }
+    .resource-card.pe-card::before { content: ''; position: absolute; top:0;left:0;bottom:0;width:3px; background: linear-gradient(180deg, #8b5cf6, #7c3aed); }
+    .resource-card .name {
+      font-weight: 600; font-size: 12px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .resource-card .detail {
+      font-size: 11px; color: var(--fg-secondary); margin-top: 4px; padding-left: 30px;
+    }
+    .resource-icon {
+      width: 22px; height: 22px;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px;
+      box-shadow: var(--shadow-sm);
+    }
+    .resource-icon.nsg { background: linear-gradient(135deg, #f97316, #ea580c); }
+    .resource-icon.fw { background: linear-gradient(135deg, #ef4444, #dc2626); }
+    .resource-icon.pe { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+    .resource-icon.peer { background: linear-gradient(135deg, #06b6d4, #0891b2); }
 
-    /* ─── Sidebar (Findings) ─── */
+    /* ─── Peering Cards ─── */
+    .peering-card {
+      border: 1px dashed rgba(6,182,212,0.35);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 10px;
+      background: linear-gradient(135deg, rgba(6,182,212,0.10) 0%, rgba(6,182,212,0.03) 100%);
+      transition: all 0.2s ease;
+    }
+    .peering-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+    .peering-card .name { font-weight: 600; font-size: 12px; display: flex; align-items: center; gap: 8px; }
+    .peering-card .detail { font-size: 11px; color: var(--fg-secondary); margin-top: 4px; padding-left: 30px; }
+
+    /* ─── Connection Lines ─── */
+    .connection-line { stroke-width: 1.5; fill: none; opacity: 0.5; }
+    .connection-line.subnet-nsg { stroke: #f97316; stroke-dasharray: 6,3; }
+    .connection-line.subnet-routetable { stroke: #06b6d4; stroke-dasharray: 6,3; }
+    .connection-line.peering { stroke: #8b5cf6; stroke-width: 2; }
+    .connection-line.private-endpoint { stroke: #10b981; stroke-dasharray: 4,2; }
+    .connection-label { font-size: 9px; fill: var(--fg-secondary); }
+
+    /* ─── Empty State ─── */
+    .empty-state {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100%; color: var(--fg-secondary); text-align: center; padding: 40px;
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 16px; filter: grayscale(0.3); }
+    .empty-state h2 { font-size: 16px; margin-bottom: 8px; }
+    .empty-state p { font-size: 13px; max-width: 400px; opacity: 0.8; }
+
+    /* ─── Sidebar ─── */
     .sidebar {
-      width: 320px;
+      width: 340px;
       border-left: 1px solid var(--border);
       background: var(--bg-secondary);
       overflow-y: auto;
       flex-shrink: 0;
+    }
+    .sidebar-header {
+      padding: 14px 18px;
+      font-weight: 700;
+      font-size: 13px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--bg-secondary);
+      z-index: 1;
+      backdrop-filter: blur(8px);
+    }
     }
 
     .sidebar-header {
@@ -525,11 +813,12 @@ export class TopologyWebviewProvider {
 </head>
 <body>
   <div class="toolbar">
-    <span style="font-weight:600;">🛡️ Azure Network Security Visualizer</span>
+    <span class="toolbar-title">🛡️ Azure Network Security</span>
     <button onclick="zoomIn()">+ Zoom</button>
-    <button onclick="zoomOut()">- Zoom</button>
+    <button onclick="zoomOut()">− Zoom</button>
     <button onclick="resetView()">Reset</button>
-    <button onclick="exportReport()" style="margin-left:auto;background:var(--vscode-button-prominentBackground,#0078d4);color:var(--vscode-button-prominentForeground,#fff);">📊 Export Report</button>
+    <button onclick="generateMermaid()">📐 Mermaid</button>
+    <button class="export-btn" onclick="exportReport()">📊 Export Report</button>
     <div class="summary" id="summary"></div>
   </div>
 
@@ -588,11 +877,11 @@ export class TopologyWebviewProvider {
       topology.vnets.forEach(vnet => {
         html += '<div class="vnet-container">';
         html += '<div class="vnet-header">';
-        html += '<span class="icon">🌐</span>';
+        html += '<div class="vnet-icon">🌐</div>';
         html += '<span>' + escapeHtml(vnet.name) + '</span>';
         html += '<span class="vnet-address">' + escapeHtml(vnet.addressSpace.join(', ')) + '</span>';
         if (vnet.location) {
-          html += '<span class="tag">' + escapeHtml(vnet.location) + '</span>';
+          html += '<span class="vnet-location">📍 ' + escapeHtml(vnet.location) + '</span>';
         }
         html += '</div>';
 
@@ -603,7 +892,7 @@ export class TopologyWebviewProvider {
 
           html += '<div class="subnet-card' + (hasIssues ? ' has-issues' : '') + '" data-resource-id="' + escapeHtml(subnet.id) + '" onclick="onSubnetClick(\\'' + escapeHtml(subnet.id) + '\\')">';
           html += '<div class="subnet-name">';
-          html += '<span>📦</span> ' + escapeHtml(subnet.name);
+          html += '<div class="subnet-icon">📦</div> ' + escapeHtml(subnet.name);
           if (hasIssues) {
             html += ' <span class="severity-dot critical"></span>';
           }
@@ -614,48 +903,48 @@ export class TopologyWebviewProvider {
             html += '<span class="tag nsg">🛡 NSG</span>';
           }
           if (subnet.routeTableId) {
-            html += '<span class="tag rt">🔀 Route Table</span>';
+            html += '<span class="tag rt">🔀 UDR</span>';
           }
           if (subnet.privateEndpoints && subnet.privateEndpoints.length > 0) {
             html += '<span class="tag pe">🔒 PE</span>';
           }
           subnet.serviceEndpoints.forEach(se => {
-            html += '<span class="tag">' + escapeHtml(se.replace('Microsoft.', '')) + '</span>';
+            html += '<span class="tag se">' + escapeHtml(se.replace('Microsoft.', '')) + '</span>';
           });
           html += '</div></div>';
         });
         html += '</div></div>';
       });
 
-      // Render standalone NSGs (not attached to VNets)
+      // Render standalone NSGs
       const standaloneNsgs = topology.nsgs.filter(n => n.rules.length > 0);
       if (standaloneNsgs.length > 0) {
-        html += '<h3 style="margin:16px 0 8px;">🛡️ Network Security Groups</h3>';
+        html += '<div class="section-header"><h3>🛡️ Network Security Groups</h3><span class="section-count">' + standaloneNsgs.length + '</span></div>';
         standaloneNsgs.forEach(nsg => {
-          html += '<div class="resource-card" data-resource-id="' + escapeHtml(nsg.id) + '" onclick="showRules(\\'' + escapeHtml(nsg.id) + '\\')" style="cursor:pointer">';
-          html += '<div class="name">🛡️ ' + escapeHtml(nsg.name) + '</div>';
-          html += '<div class="detail">' + nsg.rules.length + ' rules</div>';
+          html += '<div class="resource-card nsg-card" data-resource-id="' + escapeHtml(nsg.id) + '" onclick="showRules(\\'' + escapeHtml(nsg.id) + '\\')">';
+          html += '<div class="name"><div class="resource-icon nsg">🛡</div> ' + escapeHtml(nsg.name) + '</div>';
+          html += '<div class="detail">' + nsg.rules.length + ' security rules — click to inspect</div>';
           html += '</div>';
         });
       }
 
       // Render Firewalls
       if (topology.firewalls.length > 0) {
-        html += '<h3 style="margin:16px 0 8px;">🔥 Azure Firewalls</h3>';
+        html += '<div class="section-header"><h3>🔥 Azure Firewalls</h3><span class="section-count">' + topology.firewalls.length + '</span></div>';
         topology.firewalls.forEach(fw => {
-          html += '<div class="resource-card">';
-          html += '<div class="name">🔥 ' + escapeHtml(fw.name) + '</div>';
-          html += '<div class="detail">SKU: ' + escapeHtml(fw.skuTier) + ' | Threat Intel: ' + escapeHtml(fw.threatIntelMode) + '</div>';
+          html += '<div class="resource-card fw-card">';
+          html += '<div class="name"><div class="resource-icon fw">🔥</div> ' + escapeHtml(fw.name) + '</div>';
+          html += '<div class="detail">SKU: ' + escapeHtml(fw.skuTier) + ' · Threat Intel: ' + escapeHtml(fw.threatIntelMode) + '</div>';
           html += '</div>';
         });
       }
 
       // Render Private Endpoints
       if (topology.privateEndpoints.length > 0) {
-        html += '<h3 style="margin:16px 0 8px;">🔒 Private Endpoints</h3>';
+        html += '<div class="section-header"><h3>🔒 Private Endpoints</h3><span class="section-count">' + topology.privateEndpoints.length + '</span></div>';
         topology.privateEndpoints.forEach(pe => {
-          html += '<div class="resource-card" data-resource-id="' + escapeHtml(pe.id) + '">';
-          html += '<div class="name">🔒 ' + escapeHtml(pe.name) + '</div>';
+          html += '<div class="resource-card pe-card" data-resource-id="' + escapeHtml(pe.id) + '">';
+          html += '<div class="name"><div class="resource-icon pe">🔒</div> ' + escapeHtml(pe.name) + '</div>';
           html += '<div class="detail">Groups: ' + escapeHtml(pe.groupIds.join(', ')) + '</div>';
           html += '</div>';
         });
@@ -664,10 +953,10 @@ export class TopologyWebviewProvider {
       // Render VNet Peerings
       const allPeerings = topology.vnets.flatMap(v => v.peerings.map(p => ({ vnetName: v.name, peering: p })));
       if (allPeerings.length > 0) {
-        html += '<h3 style="margin:16px 0 8px;">🔗 VNet Peerings</h3>';
+        html += '<div class="section-header"><h3>🔗 VNet Peerings</h3><span class="section-count">' + allPeerings.length + '</span></div>';
         allPeerings.forEach(({ vnetName, peering }) => {
           html += '<div class="peering-card" data-resource-id="' + escapeHtml(peering.id) + '">';
-          html += '<div class="name">🔗 ' + escapeHtml(peering.name) + '</div>';
+          html += '<div class="name"><div class="resource-icon peer">🔗</div> ' + escapeHtml(peering.name) + '</div>';
           html += '<div class="detail">' + escapeHtml(vnetName) + ' ↔ ' + escapeHtml(peering.remoteVNetId) + '</div>';
           const flags = [];
           if (peering.allowForwardedTraffic) flags.push('forwarding');
@@ -868,6 +1157,10 @@ export class TopologyWebviewProvider {
 
     function exportReport() {
       vscode.postMessage({ command: 'exportReport' });
+    }
+
+    function generateMermaid() {
+      vscode.postMessage({ command: 'generateMermaid' });
     }
 
     function escapeHtml(str) {
