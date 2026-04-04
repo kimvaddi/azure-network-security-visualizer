@@ -10,7 +10,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { SecurityFinding, NetworkTopology, Severity } from '../models/networkModel';
 
-export type ReportFormat = 'html' | 'markdown' | 'json';
+export type ReportFormat = 'html' | 'markdown' | 'json' | 'csv';
 
 export async function exportSecurityReport(
   topology: NetworkTopology,
@@ -29,6 +29,9 @@ export async function exportSecurityReport(
       break;
     case 'json':
       content = generateJsonReport(topology, findings);
+      break;
+    case 'csv':
+      content = generateCsvReport(topology, findings);
       break;
   }
 
@@ -246,4 +249,44 @@ function generateJsonReport(topology: NetworkTopology, findings: SecurityFinding
     null,
     2
   );
+}
+
+// ─── CSV Report (opens in Excel) ────────────────────────────────────────────
+
+function generateCsvReport(_topology: NetworkTopology, findings: SecurityFinding[]): string {
+  const headers = [
+    'Rule ID',
+    'Severity',
+    'Title',
+    'Description',
+    'Recommendation',
+    'Resource Name',
+    'Resource Type',
+    'Resource ID',
+    'Evidence',
+    'Source File',
+    'Line',
+    'MS Learn Link',
+  ];
+
+  const rows = findings.map(f => [
+    f.id,
+    f.severity,
+    f.title,
+    f.description,
+    f.recommendation,
+    f.resourceName,
+    f.resourceType,
+    f.resourceId,
+    f.evidence ?? '',
+    f.filePath ?? '',
+    f.line?.toString() ?? '',
+    f.learnMoreUrl,
+  ]);
+
+  // BOM for Excel UTF-8 compatibility
+  const bom = '\uFEFF';
+  const csvLine = (cols: string[]) => cols.map(c => '"' + c.replace(/"/g, '""') + '"').join(',');
+
+  return bom + [csvLine(headers), ...rows.map(csvLine)].join('\n');
 }

@@ -153,7 +153,8 @@
           "enum": [
             "html",
             "markdown",
-            "json"
+            "json",
+            "csv"
           ],
           "description": "Default export format for security reports."
         }

@@ -165,16 +165,18 @@ async function commandExportReport(): Promise<void> {
 
   const format = await vscode.window.showQuickPick(
     [
-      { label: 'HTML Report', description: 'Rich visual report', value: 'html' as ReportFormat },
-      { label: 'Markdown Report', description: 'Portable text report', value: 'markdown' as ReportFormat },
-      { label: 'JSON Report', description: 'Machine-readable format', value: 'json' as ReportFormat },
+      { label: '📊 CSV (Excel)', description: 'Opens directly in Excel — sortable, filterable', value: 'csv' as ReportFormat },
+      { label: '🌐 HTML Report', description: 'Rich visual report — print to PDF from browser', value: 'html' as ReportFormat },
+      { label: '📝 Markdown Report', description: 'For pull requests, wikis, Git repos', value: 'markdown' as ReportFormat },
+      { label: '🔧 JSON Report', description: 'Machine-readable for CI/CD pipelines', value: 'json' as ReportFormat },
     ],
     { placeHolder: 'Select report format' }
   );
 
   if (!format) { return; }
 
-  const ext = format.value === 'markdown' ? 'md' : format.value;
+  const extMap: Record<string, string> = { csv: 'csv', html: 'html', markdown: 'md', json: 'json' };
+  const ext = extMap[format.value] ?? format.value;
   const defaultUri = vscode.workspace.workspaceFolders?.[0]
     ? vscode.Uri.joinPath(vscode.workspace.workspaceFolders[0].uri, `network-security-report.${ext}`)
     : undefined;
@@ -182,6 +184,7 @@ async function commandExportReport(): Promise<void> {
   const saveUri = await vscode.window.showSaveDialog({
     defaultUri,
     filters: {
+      'CSV (Excel)': ['csv'],
       'HTML': ['html'],
       'Markdown': ['md'],
       'JSON': ['json'],

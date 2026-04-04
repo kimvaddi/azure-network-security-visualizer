@@ -53,6 +53,14 @@ export class TopologyWebviewProvider {
         case 'showFinding':
           this.showFindingDetail(message.findingId, findings);
           break;
+        case 'openLink':
+          if (message.url && message.url.startsWith('https://')) {
+            vscode.env.openExternal(vscode.Uri.parse(message.url));
+          }
+          break;
+        case 'exportReport':
+          vscode.commands.executeCommand('azureNetSec.exportReport');
+          break;
       }
     });
   }
@@ -426,6 +434,93 @@ export class TopologyWebviewProvider {
     }
     .peering-card .name { font-weight: 600; display: flex; align-items: center; gap: 6px; }
     .peering-card .detail { font-size: 11px; color: var(--fg-secondary); margin-top: 4px; }
+
+    /* ─── Security Posture Card ─── */
+    .posture-card {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .posture-icon { font-size: 24px; margin-bottom: 6px; }
+    .posture-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+    .posture-desc { font-size: 12px; color: var(--fg-secondary); line-height: 1.5; margin-bottom: 8px; }
+    .posture-counts { display: flex; gap: 6px; flex-wrap: wrap; }
+    .posture-critical { border-left: 4px solid var(--critical); }
+    .posture-high { border-left: 4px solid var(--high); }
+    .posture-warning { border-left: 4px solid var(--warning); }
+    .posture-info { border-left: 4px solid var(--info); }
+    .posture-good { border-left: 4px solid var(--success); }
+
+    /* ─── Action Groups ─── */
+    .action-group { border-bottom: 1px solid var(--border); }
+    .group-header {
+      padding: 10px 16px;
+      cursor: pointer;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px;
+      position: relative;
+    }
+    .group-header:hover { background: var(--vscode-list-hoverBackground); }
+    .group-title { font-weight: 600; font-size: 12px; width: 100%; }
+    .group-subtitle { font-size: 11px; color: var(--fg-secondary); width: calc(100% - 20px); }
+    .group-chevron { position: absolute; right: 12px; top: 12px; font-size: 10px; color: var(--fg-secondary); }
+    .group-body { padding: 0; }
+    .group-critical .group-title { color: var(--critical); }
+    .group-high .group-title { color: var(--high); }
+    .group-warning .group-title { color: var(--warning); }
+    .group-info .group-title { color: var(--info); }
+
+    /* ─── Finding Card V2 ─── */
+    .finding-card-v2 {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .finding-card-v2:hover { background: var(--vscode-list-hoverBackground); }
+    .finding-header-v2 { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .finding-id { font-size: 10px; color: var(--fg-secondary); font-family: monospace; }
+    .finding-title-v2 { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+    .finding-guidance {
+      font-size: 11px;
+      color: var(--fg-primary);
+      line-height: 1.5;
+      margin-bottom: 6px;
+      padding: 6px 8px;
+      background: var(--bg-secondary);
+      border-radius: 4px;
+      border-left: 2px solid var(--accent);
+    }
+    .finding-resources {
+      font-size: 10px;
+      color: var(--fg-secondary);
+      margin-bottom: 4px;
+    }
+    .finding-resources code {
+      background: var(--bg-secondary);
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-size: 10px;
+    }
+    .finding-actions-v2 { display: flex; gap: 12px; }
+    .finding-actions-v2 a {
+      font-size: 11px;
+      color: var(--accent);
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .finding-actions-v2 a:hover { text-decoration: underline; }
+
+    .action-badge {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .action-badge.action-needed { background: rgba(231,76,60,0.15); color: var(--critical); }
+    .action-badge.safe { background: rgba(46,204,113,0.15); color: var(--success); }
   </style>
 </head>
 <body>
@@ -434,6 +529,7 @@ export class TopologyWebviewProvider {
     <button onclick="zoomIn()">+ Zoom</button>
     <button onclick="zoomOut()">- Zoom</button>
     <button onclick="resetView()">Reset</button>
+    <button onclick="exportReport()" style="margin-left:auto;background:var(--vscode-button-prominentBackground,#0078d4);color:var(--vscode-button-prominentForeground,#fff);">📊 Export Report</button>
     <div class="summary" id="summary"></div>
   </div>
 
@@ -449,8 +545,9 @@ export class TopologyWebviewProvider {
       <div id="topology-content" style="position:relative;z-index:2;"></div>
     </div>
     <div class="sidebar" id="sidebar">
-      <div class="sidebar-header">🔍 Security Findings</div>
-      <div id="findings-list"></div>
+      <div class="sidebar-header">�️ Security Assessment</div>
+      <div id="posture-summary"></div>
+      <div id="action-groups"></div>
     </div>
   </div>
 
@@ -590,22 +687,166 @@ export class TopologyWebviewProvider {
 
     // ─── Render Findings ───
     function renderFindings() {
-      const list = document.getElementById('findings-list');
-      if (findings.length === 0) {
-        list.innerHTML = '<div style="padding:16px;color:var(--fg-secondary);text-align:center;">✅ No security issues found</div>';
+      renderPostureSummary();
+      renderActionGroups();
+    }
+
+    function renderPostureSummary() {
+      const el = document.getElementById('posture-summary');
+      const counts = { critical: 0, high: 0, warning: 0, info: 0 };
+      findings.forEach(f => counts[f.severity]++);
+      const total = findings.length;
+
+      if (total === 0) {
+        el.innerHTML = '<div class="posture-card posture-good">' +
+          '<div class="posture-icon">✅</div>' +
+          '<div class="posture-title">Excellent Security Posture</div>' +
+          '<div class="posture-desc">No misconfigurations detected. Your network aligns with Microsoft Security Benchmark.</div>' +
+          '</div>';
         return;
       }
 
-      list.innerHTML = findings.map(f => {
-        return '<div class="finding-card" onclick="onFindingClick(\\'' + escapeHtml(f.id) + '\\')">' +
-          '<div class="finding-title">' +
-          '<span class="severity-dot ' + f.severity + '"></span>' +
-          '<span>[' + escapeHtml(f.id) + '] ' + escapeHtml(f.title) + '</span>' +
-          '</div>' +
-          '<div class="finding-desc">' + escapeHtml(f.description).substring(0, 120) + '...</div>' +
-          '<div class="finding-resource">' + escapeHtml(f.resourceName) + '</div>' +
-          '</div>';
-      }).join('');
+      // Determine overall posture
+      let postureClass, postureIcon, postureTitle, postureAction;
+      if (counts.critical > 0) {
+        postureClass = 'posture-critical';
+        postureIcon = '🚨';
+        postureTitle = 'Immediate Action Required';
+        postureAction = counts.critical + ' critical issue' + (counts.critical > 1 ? 's' : '') + ' expose your network to the internet. Fix these first.';
+      } else if (counts.high > 0) {
+        postureClass = 'posture-high';
+        postureIcon = '⚠️';
+        postureTitle = 'Action Recommended';
+        postureAction = counts.high + ' high-severity issue' + (counts.high > 1 ? 's' : '') + ' weaken your security posture. Review and remediate.';
+      } else if (counts.warning > 0) {
+        postureClass = 'posture-warning';
+        postureIcon = '💡';
+        postureTitle = 'Good — Minor Improvements Available';
+        postureAction = 'No critical or high issues. ' + counts.warning + ' best-practice improvement' + (counts.warning > 1 ? 's' : '') + ' available.';
+      } else {
+        postureClass = 'posture-info';
+        postureIcon = '✅';
+        postureTitle = 'Good Security Posture';
+        postureAction = 'Only informational advisories. Your network follows Microsoft best practices.';
+      }
+
+      el.innerHTML = '<div class="posture-card ' + postureClass + '">' +
+        '<div class="posture-icon">' + postureIcon + '</div>' +
+        '<div class="posture-title">' + postureTitle + '</div>' +
+        '<div class="posture-desc">' + postureAction + '</div>' +
+        '<div class="posture-counts">' +
+        (counts.critical > 0 ? '<span class="badge critical">' + counts.critical + ' Critical</span>' : '') +
+        (counts.high > 0 ? '<span class="badge high">' + counts.high + ' High</span>' : '') +
+        (counts.warning > 0 ? '<span class="badge warning">' + counts.warning + ' Warning</span>' : '') +
+        (counts.info > 0 ? '<span class="badge info">' + counts.info + ' Info</span>' : '') +
+        '</div>' +
+        '</div>';
+    }
+
+    // Action guidance per rule ID
+    const ruleGuidance = {
+      'NETSEC-001': { action: '🔴 FIX NOW', guidance: 'Remove SSH rule. Use Azure Bastion for secure access.', safe: false },
+      'NETSEC-002': { action: '🔴 FIX NOW', guidance: 'Remove RDP rule. Use Azure Bastion or JIT access.', safe: false },
+      'NETSEC-003': { action: '🔴 FIX NOW', guidance: 'Replace with specific allow rules for required traffic only.', safe: false },
+      'NETSEC-004': { action: '🟡 IMPROVE', guidance: 'Add explicit deny-all at priority 4096. Aids auditing and flow logs.', safe: true },
+      'NETSEC-005': { action: '🟠 REVIEW', guidance: 'Restrict source to specific IPs or Service Tags.', safe: false },
+      'NETSEC-006': { action: '🟠 REVIEW', guidance: 'Restrict outbound to required destinations and ports.', safe: false },
+      'NETSEC-007': { action: '🟠 REVIEW', guidance: 'Attach an NSG with least-privilege rules to this subnet.', safe: false },
+      'NETSEC-008': { action: '🟡 IMPROVE', guidance: 'Narrow port range to only the ports your app actually needs.', safe: true },
+      'NETSEC-009': { action: '🟡 IMPROVE', guidance: 'Remove catch-all allow rule. Use JIT access if temporary.', safe: false },
+      'NETSEC-010': { action: '🟠 REVIEW', guidance: 'Set threatIntelMode to Deny to block known malicious IPs.', safe: false },
+      'NETSEC-011': { action: '✅ ADVISORY', guidance: 'Enable VNet/NSG flow logs for visibility. Not a vulnerability.', safe: true },
+      'NETSEC-012': { action: '✅ ADVISORY', guidance: 'Consider Service Tags instead of hardcoded IPs — auto-updated by Microsoft.', safe: true },
+      'NETSEC-013': { action: '✅ ADVISORY', guidance: 'Review overlapping rules — higher priority rule wins. Confirm intent.', safe: true },
+      'NETSEC-014': { action: '🟡 IMPROVE', guidance: 'Route through Azure Firewall for inspection instead of direct internet.', safe: false },
+    };
+
+    function renderActionGroups() {
+      const el = document.getElementById('action-groups');
+      if (findings.length === 0) { el.innerHTML = ''; return; }
+
+      // Group findings into action categories
+      const fixNow = findings.filter(f => ['critical'].includes(f.severity));
+      const review = findings.filter(f => ['high'].includes(f.severity));
+      const improve = findings.filter(f => ['warning'].includes(f.severity));
+      const advisory = findings.filter(f => ['info'].includes(f.severity));
+
+      let html = '';
+
+      if (fixNow.length > 0) {
+        html += renderGroup('🚨 Fix Immediately', 'These expose your network to the internet.', fixNow, 'group-critical');
+      }
+      if (review.length > 0) {
+        html += renderGroup('⚠️ Review & Remediate', 'These weaken your security posture.', review, 'group-high');
+      }
+      if (improve.length > 0) {
+        html += renderGroup('💡 Best Practice Improvements', 'Not vulnerabilities — but improvements for defense-in-depth.', improve, 'group-warning');
+      }
+      if (advisory.length > 0) {
+        html += renderGroup('ℹ️ Informational — Safe to Acknowledge', 'Advisories only — no action required. Your configuration is safe.', advisory, 'group-info');
+      }
+
+      el.innerHTML = html;
+    }
+
+    function renderGroup(title, subtitle, groupFindings, cssClass) {
+      // Deduplicate by rule ID and aggregate affected resources
+      const byRule = {};
+      groupFindings.forEach(f => {
+        if (!byRule[f.id]) {
+          byRule[f.id] = { finding: f, resources: [] };
+        }
+        byRule[f.id].resources.push(f.resourceName);
+      });
+
+      let html = '<div class="action-group ' + cssClass + '">';
+      html += '<div class="group-header" onclick="toggleGroup(this)">';
+      html += '<span class="group-title">' + title + ' (' + groupFindings.length + ')</span>';
+      html += '<span class="group-subtitle">' + subtitle + '</span>';
+      html += '<span class="group-chevron">▼</span>';
+      html += '</div>';
+      html += '<div class="group-body">';
+
+      Object.keys(byRule).forEach(ruleId => {
+        const { finding, resources } = byRule[ruleId];
+        const guide = ruleGuidance[ruleId] || { action: '❓ REVIEW', guidance: finding.recommendation, safe: false };
+        const uniqueResources = [...new Set(resources)];
+
+        html += '<div class="finding-card-v2" onclick="onFindingClick(\\'' + escapeHtml(finding.id) + '\\')">';
+        html += '<div class="finding-header-v2">';
+        html += '<span class="action-badge ' + (guide.safe ? 'safe' : 'action-needed') + '">' + guide.action + '</span>';
+        html += '<span class="finding-id">' + escapeHtml(ruleId) + '</span>';
+        html += '</div>';
+        html += '<div class="finding-title-v2">' + escapeHtml(finding.title) + '</div>';
+        html += '<div class="finding-guidance">' + escapeHtml(guide.guidance) + '</div>';
+        html += '<div class="finding-resources">' + uniqueResources.length + ' resource' + (uniqueResources.length > 1 ? 's' : '') + ': ';
+        html += uniqueResources.slice(0, 5).map(r => '<code>' + escapeHtml(r) + '</code>').join(', ');
+        if (uniqueResources.length > 5) html += ' +' + (uniqueResources.length - 5) + ' more';
+        html += '</div>';
+        html += '<div class="finding-actions-v2">';
+        html += '<a class="ms-learn-link" data-url="' + escapeHtml(finding.learnMoreUrl) + '">📖 How to Fix (MS Learn)</a>';
+        html += '</div>';
+        html += '</div>';
+      });
+
+      html += '</div></div>';
+      return html;
+    }
+
+    function toggleGroup(header) {
+      const body = header.nextElementSibling;
+      const chevron = header.querySelector('.group-chevron');
+      if (body.style.display === 'none') {
+        body.style.display = 'block';
+        chevron.textContent = '▼';
+      } else {
+        body.style.display = 'none';
+        chevron.textContent = '▶';
+      }
+    }
+
+    function openLink(url) {
+      vscode.postMessage({ command: 'openLink', url: url });
     }
 
     // ─── Event Handlers ───
@@ -623,6 +864,10 @@ export class TopologyWebviewProvider {
 
     function onFindingClick(findingId) {
       vscode.postMessage({ command: 'showFinding', findingId: findingId });
+    }
+
+    function exportReport() {
+      vscode.postMessage({ command: 'exportReport' });
     }
 
     function escapeHtml(str) {
@@ -699,6 +944,19 @@ export class TopologyWebviewProvider {
     renderSummary();
     renderTopology();
     renderFindings();
+
+    // Delegated click handler for MS Learn links (avoids inline JS escaping issues)
+    document.addEventListener('click', function(e) {
+      const link = e.target.closest('.ms-learn-link');
+      if (link) {
+        e.preventDefault();
+        e.stopPropagation();
+        const url = link.getAttribute('data-url');
+        if (url) {
+          vscode.postMessage({ command: 'openLink', url: url });
+        }
+      }
+    });
   </script>
 </body>
 </html>`;

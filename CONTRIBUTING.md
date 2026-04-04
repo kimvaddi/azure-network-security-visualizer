@@ -26,7 +26,7 @@ npm run lint           # ESLint
 | `src/parsers/` | Bicep/ARM template parsing |
 | `src/analyzers/` | Security rule detection (NETSEC-001 through NETSEC-014) |
 | `src/webview/` | D3-based topology visualization |
-| `src/reports/` | HTML/Markdown/JSON report export |
+| `src/reports/` | HTML/Markdown/JSON/CSV report export |
 | `src/models/` | TypeScript interfaces (pure types, no logic) |
 | `src/azure/` | Azure Entra ID authentication and live topology via Resource Graph |
 

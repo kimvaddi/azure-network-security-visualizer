@@ -327,17 +327,20 @@ After saving (`Ctrl+S`), the extension **automatically re-analyzes** your file. 
 
 Share your findings with your team or attach them to a pull request:
 
-1. Press `Ctrl+Shift+P` → **"Azure NetSec: Export Security Report"**
+1. Click the **📊 Export Report** button in the topology toolbar, or press `Ctrl+Shift+P` → **"Azure NetSec: Export Security Report"**
 2. Choose a format:
 
 | Format | Best For |
 |--------|----------|
-| **HTML** | Sharing with managers or attaching to emails — looks professional with color-coded severity badges |
-| **Markdown** | Adding to pull requests, wikis, or Git repos |
-| **JSON** | Feeding into CI/CD pipelines or automated compliance tools |
+| **📊 CSV (Excel)** | Opens directly in Excel — sort, filter, pivot. Best for security teams. |
+| **🌐 HTML** | Rich visual report — print to PDF from browser (Ctrl+P). Best for management. |
+| **📝 Markdown** | Adding to pull requests, wikis, or Git repos. Best for DevOps. |
+| **🔧 JSON** | Feeding into CI/CD pipelines or automated compliance tools. Best for automation. |
 
 3. Choose a save location
 4. Open the report — it includes topology summary, all findings with recommendations, and links to Microsoft Learn
+
+> 💡 **Need PDF or Word?** Export as HTML → open in browser → Ctrl+P → "Save as PDF". Or open the HTML in Microsoft Word → "Save As .docx".
 
 ---
 
@@ -412,8 +415,18 @@ Connect to your real Azure environment and visualize deployed resources across *
 ### 🛡️ Security Analysis Engine (14 Rules)
 Automatically detects misconfigurations based on [Microsoft Security Benchmark](https://learn.microsoft.com/security/benchmark/azure/overview). Runs offline — no Azure subscription required.
 
+- **Security posture assessment** — instant summary: "Immediate Action Required" vs "Good posture"
+- **Findings grouped by action** — "Fix Immediately", "Review & Remediate", "Best Practice Improvements", "Safe to Acknowledge"
+- **Actionable guidance per rule** — tells you exactly what to do, not just what's wrong
+- **Deduplicated by rule** — 29 NETSEC-001 findings become one card showing "12 resources affected"
+- **Clickable MS Learn links** — "📖 How to Fix" opens the official Microsoft remediation guide
+
 ### 📊 Security Reports
-Export findings as HTML, Markdown, or JSON — each includes topology summary, severity counts, per-finding recommendations, and Microsoft Learn links.
+Export findings directly from the webview via the **📊 Export Report** button:
+- **CSV (Excel)** — Opens directly in Excel with sortable, filterable columns
+- **HTML** — Rich visual report — print to PDF from browser (Ctrl+P)
+- **Markdown** — For pull requests, wikis, Git repos
+- **JSON** — Machine-readable for CI/CD pipelines
 
 ### ☁️ Live Azure Topology (Cross-Subscription)
 - Sign in via **Microsoft Entra ID** (Azure AD) — uses VS Code's built-in auth
@@ -460,7 +473,7 @@ All rules are based on [Microsoft Security Benchmark](https://learn.microsoft.co
 | `Azure NetSec: Visualize Network Topology` | `Ctrl+Shift+P` → type "Visualize" | Open interactive topology from local Bicep/ARM files |
 | `Azure NetSec: Analyze Current File` | | Analyze the active Bicep/ARM file and show inline diagnostics |
 | `Azure NetSec: Analyze Workspace Security` | | Scan all networking files in the workspace |
-| `Azure NetSec: Export Security Report` | | Export findings as HTML, Markdown, or JSON |
+| `Azure NetSec: Export Security Report` | | Export findings as CSV (Excel), HTML, Markdown, or JSON |
 | `Azure NetSec: Show Effective Rules for Resource` | | Pick an NSG and view all its rules sorted by priority |
 | `Azure NetSec: Sign In to Azure (Entra ID)` | | Authenticate to Azure and list available subscriptions |
 | `Azure NetSec: Visualize Live Azure Topology` | | Fetch and visualize deployed resources across selected subscriptions |
@@ -474,7 +487,7 @@ All rules are based on [Microsoft Security Benchmark](https://learn.microsoft.co
 | `azureNetSec.severityThreshold` | `warning` | Minimum severity to show (`critical`, `high`, `warning`, `info`) |
 | `azureNetSec.autoAnalyzeOnSave` | `true` | Automatically re-analyze when you save a Bicep/ARM file |
 | `azureNetSec.showInlineDecorations` | `true` | Show yellow/red squiggles on problematic lines |
-| `azureNetSec.reportFormat` | `html` | Default format for "Export Security Report" |
+| `azureNetSec.reportFormat` | `html` | Default format: `html`, `markdown`, `json`, `csv` |
 
 To change settings: **File** → **Preferences** → **Settings** → search **"azureNetSec"**.
 
