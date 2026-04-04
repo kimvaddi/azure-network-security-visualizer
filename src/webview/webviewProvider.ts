@@ -814,11 +814,11 @@ export class TopologyWebviewProvider {
 <body>
   <div class="toolbar">
     <span class="toolbar-title">🛡️ Azure Network Security</span>
-    <button onclick="zoomIn()">+ Zoom</button>
-    <button onclick="zoomOut()">− Zoom</button>
-    <button onclick="resetView()">Reset</button>
-    <button onclick="generateMermaid()">📐 Mermaid</button>
-    <button class="export-btn" onclick="exportReport()">📊 Export Report</button>
+    <button data-action="zoomIn">+ Zoom</button>
+    <button data-action="zoomOut">− Zoom</button>
+    <button data-action="resetView">Reset</button>
+    <button data-action="generateMermaid">📐 Mermaid</button>
+    <button class="export-btn" data-action="exportReport">📊 Export Report</button>
     <div class="summary" id="summary"></div>
   </div>
 
@@ -890,7 +890,7 @@ export class TopologyWebviewProvider {
           const subnetFindings = findings.filter(f => f.resourceName === subnet.name || f.resourceId === subnet.id);
           const hasIssues = subnetFindings.length > 0;
 
-          html += '<div class="subnet-card' + (hasIssues ? ' has-issues' : '') + '" data-resource-id="' + escapeHtml(subnet.id) + '" onclick="onSubnetClick(\\'' + escapeHtml(subnet.id) + '\\')">';
+          html += '<div class="subnet-card' + (hasIssues ? ' has-issues' : '') + '" data-resource-id="' + escapeHtml(subnet.id) + '" data-action="subnetClick" data-id="' + escapeHtml(subnet.id) + '">';
           html += '<div class="subnet-name">';
           html += '<div class="subnet-icon">📦</div> ' + escapeHtml(subnet.name);
           if (hasIssues) {
@@ -921,7 +921,7 @@ export class TopologyWebviewProvider {
       if (standaloneNsgs.length > 0) {
         html += '<div class="section-header"><h3>🛡️ Network Security Groups</h3><span class="section-count">' + standaloneNsgs.length + '</span></div>';
         standaloneNsgs.forEach(nsg => {
-          html += '<div class="resource-card nsg-card" data-resource-id="' + escapeHtml(nsg.id) + '" onclick="showRules(\\'' + escapeHtml(nsg.id) + '\\')">';
+          html += '<div class="resource-card nsg-card" data-resource-id="' + escapeHtml(nsg.id) + '" data-action="showRules" data-id="' + escapeHtml(nsg.id) + '">';
           html += '<div class="name"><div class="resource-icon nsg">🛡</div> ' + escapeHtml(nsg.name) + '</div>';
           html += '<div class="detail">' + nsg.rules.length + ' security rules — click to inspect</div>';
           html += '</div>';
@@ -1089,7 +1089,7 @@ export class TopologyWebviewProvider {
       });
 
       let html = '<div class="action-group ' + cssClass + '">';
-      html += '<div class="group-header" onclick="toggleGroup(this)">';
+      html += '<div class="group-header" data-action="toggleGroup">';
       html += '<span class="group-title">' + title + ' (' + groupFindings.length + ')</span>';
       html += '<span class="group-subtitle">' + subtitle + '</span>';
       html += '<span class="group-chevron">▼</span>';
@@ -1101,7 +1101,7 @@ export class TopologyWebviewProvider {
         const guide = ruleGuidance[ruleId] || { action: '❓ REVIEW', guidance: finding.recommendation, safe: false };
         const uniqueResources = [...new Set(resources)];
 
-        html += '<div class="finding-card-v2" onclick="onFindingClick(\\'' + escapeHtml(finding.id) + '\\')">';
+        html += '<div class="finding-card-v2" data-action="findingClick" data-id="' + escapeHtml(finding.id) + '">';
         html += '<div class="finding-header-v2">';
         html += '<span class="action-badge ' + (guide.safe ? 'safe' : 'action-needed') + '">' + guide.action + '</span>';
         html += '<span class="finding-id">' + escapeHtml(ruleId) + '</span>';
@@ -1238,16 +1238,45 @@ export class TopologyWebviewProvider {
     renderTopology();
     renderFindings();
 
-    // Delegated click handler for MS Learn links (avoids inline JS escaping issues)
+    // Single delegated event handler for ALL clicks (CSP blocks inline onclick)
     document.addEventListener('click', function(e) {
+      // MS Learn links
       const link = e.target.closest('.ms-learn-link');
       if (link) {
         e.preventDefault();
         e.stopPropagation();
         const url = link.getAttribute('data-url');
-        if (url) {
-          vscode.postMessage({ command: 'openLink', url: url });
-        }
+        if (url) { vscode.postMessage({ command: 'openLink', url: url }); }
+        return;
+      }
+
+      // data-action elements (buttons, cards, headers)
+      const actionEl = e.target.closest('[data-action]');
+      if (!actionEl) return;
+
+      const action = actionEl.getAttribute('data-action');
+      const id = actionEl.getAttribute('data-id');
+
+      switch (action) {
+        case 'zoomIn': zoomIn(); break;
+        case 'zoomOut': zoomOut(); break;
+        case 'resetView': resetView(); break;
+        case 'exportReport': exportReport(); break;
+        case 'generateMermaid': generateMermaid(); break;
+        case 'subnetClick': onSubnetClick(id); break;
+        case 'showRules': showRules(id); break;
+        case 'findingClick': onFindingClick(id); break;
+        case 'toggleGroup':
+          const body = actionEl.nextElementSibling;
+          const chevron = actionEl.querySelector('.group-chevron');
+          if (body.style.display === 'none') {
+            body.style.display = 'block';
+            if (chevron) chevron.textContent = '▼';
+          } else {
+            body.style.display = 'none';
+            if (chevron) chevron.textContent = '▶';
+          }
+          break;
       }
     });
   </script>
