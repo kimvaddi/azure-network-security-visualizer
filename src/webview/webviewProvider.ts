@@ -1055,6 +1055,11 @@ export class TopologyWebviewProvider {
       'NETSEC-019': { action: '🟡 IMPROVE', guidance: 'Switch WAF from Detection to Prevention mode to actively block attacks.', safe: false },
       'NETSEC-020': { action: '🔴 FIX NOW', guidance: 'Set minProtocolVersion to TLSv1_2. TLS 1.0/1.1 are deprecated.', safe: false },
       'NETSEC-021': { action: '🟡 IMPROVE', guidance: 'Add route table with 0.0.0.0/0 → Firewall for forced tunneling.', safe: false },
+      'NETSEC-022': { action: '🟠 REVIEW', guidance: 'Upgrade from Basic SKU — lacks IKEv2, custom crypto, RADIUS auth.', safe: false },
+      'NETSEC-023': { action: '🟡 IMPROVE', guidance: 'Switch to RouteBased VPN for IKEv2, multiple tunnels, custom IPsec.', safe: false },
+      'NETSEC-024': { action: '✅ ADVISORY', guidance: 'Consider Application Security Groups for microsegmentation instead of IP CIDRs.', safe: true },
+      'NETSEC-025': { action: '✅ ADVISORY', guidance: 'Add forced tunneling UDR (0.0.0.0/0 → Firewall) on workload subnets.', safe: true },
+      'NETSEC-026': { action: '✅ ADVISORY', guidance: 'Enable DDoS Protection on public IP addresses or parent VNet.', safe: true },
     };
 
     function renderActionGroups() {

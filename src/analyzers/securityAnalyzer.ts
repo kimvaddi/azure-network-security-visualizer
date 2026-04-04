@@ -21,6 +21,7 @@ import {
   AzureFirewall,
   PrivateEndpoint,
   ApplicationGateway,
+  VpnGateway,
 } from '../models/networkModel';
 
 // ─── Rule IDs ───────────────────────────────────────────────────────────────
@@ -47,6 +48,11 @@ export const RULE_IDS = {
   APPGW_WAF_DETECTION_ONLY: 'NETSEC-019',
   APPGW_WEAK_TLS: 'NETSEC-020',
   SUBNET_NO_UDR: 'NETSEC-021',
+  VPN_GW_BASIC_SKU: 'NETSEC-022',
+  VPN_GW_POLICY_BASED: 'NETSEC-023',
+  NSG_NO_ASG: 'NETSEC-024',
+  FW_NO_FORCED_TUNNEL: 'NETSEC-025',
+  PUBLIC_IP_NO_DDOS: 'NETSEC-026',
 } as const;
 
 // ─── Analyzer ───────────────────────────────────────────────────────────────
@@ -92,6 +98,16 @@ export function analyzeTopology(topology: NetworkTopology): SecurityFinding[] {
   // Zero Trust: Analyze subnets for forced tunneling (UDR)
   for (const vnet of topology.vnets) {
     findings.push(...analyzeSubnetRouting(vnet, topology));
+  }
+
+  // Zero Trust: VPN Gateways
+  for (const vpn of (topology.vpnGateways ?? [])) {
+    findings.push(...analyzeVpnGateway(vpn));
+  }
+
+  // Zero Trust: Firewall forced tunneling
+  for (const fw of topology.firewalls) {
+    findings.push(...analyzeFirewallForcedTunnel(fw, topology));
   }
 
   // Sort by severity
@@ -530,6 +546,59 @@ function analyzeSubnetRouting(vnet: VirtualNetwork, topology: NetworkTopology): 
     }
   }
 
+  return findings;
+}
+
+// ─── Zero Trust: VPN Gateway Analysis ───────────────────────────────────────
+
+function analyzeVpnGateway(vpn: VpnGateway): SecurityFinding[] {
+  const findings: SecurityFinding[] = [];
+  if (vpn.skuName.toLowerCase() === 'basic') {
+    findings.push({
+      id: RULE_IDS.VPN_GW_BASIC_SKU,
+      severity: 'high',
+      title: `VPN Gateway "${vpn.name}" uses Basic SKU`,
+      description: `VPN Gateway "${vpn.name}" uses the Basic SKU which does not support custom IPsec/IKE policies, IKEv2, or RADIUS authentication. Basic SKU is not recommended for production.`,
+      recommendation: 'Upgrade to VpnGw1 or higher SKU for production workloads. Basic SKU has limited security features. Ref: https://learn.microsoft.com/azure/vpn-gateway/about-gateway-skus',
+      learnMoreUrl: 'https://learn.microsoft.com/azure/vpn-gateway/about-gateway-skus',
+      resourceId: vpn.id, resourceType: 'Microsoft.Network/virtualNetworkGateways', resourceName: vpn.name,
+      line: vpn.sourceLocation?.line, filePath: vpn.sourceLocation?.filePath,
+    });
+  }
+  if (vpn.vpnType === 'PolicyBased') {
+    findings.push({
+      id: RULE_IDS.VPN_GW_POLICY_BASED,
+      severity: 'warning',
+      title: `VPN Gateway "${vpn.name}" is policy-based`,
+      description: `VPN Gateway "${vpn.name}" uses PolicyBased VPN type. Policy-based gateways are legacy and only support IKEv1 with limited tunnel configurations.`,
+      recommendation: 'Use RouteBased VPN type which supports IKEv2, multiple tunnels, and custom IPsec/IKE policies. Ref: https://learn.microsoft.com/azure/vpn-gateway/vpn-gateway-about-vpn-gateway-settings#vpntype',
+      learnMoreUrl: 'https://learn.microsoft.com/azure/vpn-gateway/vpn-gateway-about-vpn-gateway-settings#vpntype',
+      resourceId: vpn.id, resourceType: 'Microsoft.Network/virtualNetworkGateways', resourceName: vpn.name,
+      line: vpn.sourceLocation?.line, filePath: vpn.sourceLocation?.filePath,
+    });
+  }
+  return findings;
+}
+
+// ─── Zero Trust: Firewall Forced Tunnel Analysis ───────────────────────────
+
+function analyzeFirewallForcedTunnel(fw: AzureFirewall, topology: NetworkTopology): SecurityFinding[] {
+  const findings: SecurityFinding[] = [];
+  const hasForwardRoute = topology.routeTables.some(rt => 
+    rt.routes.some(r => r.addressPrefix === '0.0.0.0/0' && r.nextHopType === 'VirtualAppliance')
+  );
+  if (!hasForwardRoute && topology.routeTables.length > 0) {
+    findings.push({
+      id: RULE_IDS.FW_NO_FORCED_TUNNEL,
+      severity: 'info',
+      title: `No forced tunneling route to firewall "${fw.name}" detected`,
+      description: `Azure Firewall "${fw.name}" exists but no route table has a 0.0.0.0/0 route pointing to a VirtualAppliance. Subnets may bypass firewall inspection.`,
+      recommendation: 'Create a 0.0.0.0/0 UDR pointing to the firewall private IP and associate it with workload subnets. Ref: https://learn.microsoft.com/azure/firewall/forced-tunneling',
+      learnMoreUrl: 'https://learn.microsoft.com/azure/firewall/forced-tunneling',
+      resourceId: fw.id, resourceType: 'Microsoft.Network/azureFirewalls', resourceName: fw.name,
+      line: fw.sourceLocation?.line, filePath: fw.sourceLocation?.filePath,
+    });
+  }
   return findings;
 }
 

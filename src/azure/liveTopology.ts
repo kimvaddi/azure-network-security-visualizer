@@ -24,6 +24,7 @@ import {
   VNetPeering,
   ApplicationGateway,
   BastionHost,
+  VpnGateway,
   RuleDirection,
   RuleAccess,
   RuleProtocol,
@@ -41,7 +42,8 @@ Resources
     'microsoft.network/privateendpoints',
     'microsoft.network/azurefirewalls',
     'microsoft.network/applicationgateways',
-    'microsoft.network/bastionhosts'
+    'microsoft.network/bastionhosts',
+    'microsoft.network/virtualnetworkgateways'
   )
 | project id, name, type, location, resourceGroup, subscriptionId, properties, tags
 | order by type asc, name asc
@@ -147,6 +149,7 @@ function mapResourcesToTopology(resources: ResourceGraphRow[], peeringRows: Peer
   const firewalls: AzureFirewall[] = [];
   const applicationGateways: ApplicationGateway[] = [];
   const bastionHosts: BastionHost[] = [];
+  const vpnGateways: VpnGateway[] = [];
 
   for (const r of resources) {
     try {
@@ -166,13 +169,15 @@ function mapResourcesToTopology(resources: ResourceGraphRow[], peeringRows: Peer
         applicationGateways.push(mapAppGateway(r));
       } else if (typeLower === 'microsoft.network/bastionhosts') {
         bastionHosts.push(mapBastionHost(r));
+      } else if (typeLower === 'microsoft.network/virtualnetworkgateways') {
+        vpnGateways.push(mapVpnGateway(r));
       }
     } catch {
       // Skip malformed resources
     }
   }
 
-  return { vnets, nsgs, routeTables, privateEndpoints, firewalls, applicationGateways, bastionHosts, connections: [] };
+  return { vnets, nsgs, routeTables, privateEndpoints, firewalls, applicationGateways, bastionHosts, vpnGateways, connections: [] };
 }
 
 // ─── Safe Property Helpers ──────────────────────────────────────────────────
@@ -377,6 +382,21 @@ function mapBastionHost(r: ResourceGraphRow): BastionHost {
     id: r.id,
     name: r.name,
     skuName: (sku?.name ?? 'Standard') as BastionHost['skuName'],
+    sourceLocation: { filePath: `azure://${r.subscriptionId}/${r.resourceGroup}/${r.name}`, line: 0 },
+  };
+}
+
+// ─── VPN Gateway Mapping ────────────────────────────────────────────────────
+
+function mapVpnGateway(r: ResourceGraphRow): VpnGateway {
+  const props = r.properties;
+  const sku = prop<{ name: string }>(props, 'sku');
+  return {
+    id: r.id, name: r.name,
+    skuName: sku?.name ?? 'VpnGw1',
+    gatewayType: strProp(props, 'gatewayType') || 'Vpn',
+    vpnType: strProp(props, 'vpnType') || 'RouteBased',
+    vpnGatewayGeneration: prop<string>(props, 'vpnGatewayGeneration'),
     sourceLocation: { filePath: `azure://${r.subscriptionId}/${r.resourceGroup}/${r.name}`, line: 0 },
   };
 }

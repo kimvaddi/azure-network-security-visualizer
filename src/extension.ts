@@ -377,6 +377,7 @@ async function parseWorkspace(): Promise<ParseResult | undefined> {
         firewalls: [],
         applicationGateways: [],
         bastionHosts: [],
+        vpnGateways: [],
         connections: [],
       };
 
@@ -451,6 +452,7 @@ function mergeTopology(target: NetworkTopology, partial: Partial<NetworkTopology
   if (partial.firewalls) { target.firewalls.push(...partial.firewalls); }
   if (partial.applicationGateways) { target.applicationGateways.push(...partial.applicationGateways); }
   if (partial.bastionHosts) { target.bastionHosts.push(...partial.bastionHosts); }
+  if (partial.vpnGateways) { target.vpnGateways.push(...partial.vpnGateways); }
 }
 
 function resolveConnections(topology: NetworkTopology): void {
@@ -526,6 +528,7 @@ async function analyzeAndUpdateDiagnostics(document: vscode.TextDocument): Promi
     firewalls: partial.firewalls ?? [],
     applicationGateways: partial.applicationGateways ?? [],
     bastionHosts: partial.bastionHosts ?? [],
+    vpnGateways: partial.vpnGateways ?? [],
     connections: [],
   };
 

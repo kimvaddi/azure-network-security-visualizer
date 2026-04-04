@@ -22,6 +22,7 @@ import {
   FirewallRule,
   ApplicationGateway,
   BastionHost,
+  VpnGateway,
   RuleDirection,
   RuleAccess,
   RuleProtocol,
@@ -79,6 +80,7 @@ export function parseArmTemplate(content: string, options: ArmParseOptions): Par
   const firewalls: AzureFirewall[] = [];
   const applicationGateways: ApplicationGateway[] = [];
   const bastionHosts: BastionHost[] = [];
+  const vpnGateways: VpnGateway[] = [];
 
   const allResources = flattenResources(template.resources ?? []);
 
@@ -100,6 +102,8 @@ export function parseArmTemplate(content: string, options: ArmParseOptions): Par
       applicationGateways.push(parseArmAppGateway(resource, options.filePath, line));
     } else if (typeLower === 'microsoft.network/bastionhosts') {
       bastionHosts.push(parseArmBastionHost(resource, options.filePath, line));
+    } else if (typeLower === 'microsoft.network/virtualnetworkgateways') {
+      vpnGateways.push(parseArmVpnGateway(resource, options.filePath, line));
     }
   }
 
@@ -111,6 +115,7 @@ export function parseArmTemplate(content: string, options: ArmParseOptions): Par
     firewalls,
     applicationGateways,
     bastionHosts,
+    vpnGateways,
     connections: [],
   };
 }
@@ -360,6 +365,21 @@ function parseArmBastionHost(resource: ArmResource, filePath: string, line: numb
     id: resource.name,
     name: resource.name,
     skuName: (sku?.name ?? 'Standard') as BastionHost['skuName'],
+    sourceLocation: { filePath, line },
+  };
+}
+
+// ─── VPN Gateway Parser ─────────────────────────────────────────────────────
+
+function parseArmVpnGateway(resource: ArmResource, filePath: string, line: number): VpnGateway {
+  const props = resource.properties ?? {};
+  const sku = getProp<{ name: string }>(props, 'sku');
+  return {
+    id: resource.name, name: resource.name,
+    skuName: sku?.name ?? 'VpnGw1',
+    gatewayType: getStringProp(props, 'gatewayType') || 'Vpn',
+    vpnType: getStringProp(props, 'vpnType') || 'RouteBased',
+    vpnGatewayGeneration: getProp<string>(props, 'vpnGatewayGeneration'),
     sourceLocation: { filePath, line },
   };
 }

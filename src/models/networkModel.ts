@@ -193,6 +193,18 @@ export interface BastionHost {
   sourceLocation?: { filePath: string; line: number };
 }
 
+// ─── VPN Gateway ─────────────────────────────────────────────────────────────
+
+export interface VpnGateway {
+  id: string;
+  name: string;
+  skuName: string;
+  gatewayType: 'Vpn' | 'ExpressRoute' | string;
+  vpnType: 'PolicyBased' | 'RouteBased' | string;
+  vpnGatewayGeneration?: 'Generation1' | 'Generation2' | 'None' | string;
+  sourceLocation?: { filePath: string; line: number };
+}
+
 // ─── Network Topology (Aggregate) ───────────────────────────────────────────
 
 export interface NetworkTopology {
@@ -205,6 +217,8 @@ export interface NetworkTopology {
   applicationGateways: ApplicationGateway[];
   /** Azure Bastion hosts */
   bastionHosts: BastionHost[];
+  /** VPN Gateways */
+  vpnGateways: VpnGateway[];
   /** Cross-references resolved after parsing */
   connections: TopologyConnection[];
 }

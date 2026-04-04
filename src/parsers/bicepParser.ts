@@ -23,6 +23,7 @@ import {
   VNetPeering,
   ApplicationGateway,
   BastionHost,
+  VpnGateway,
   RuleDirection,
   RuleAccess,
   RuleProtocol,
@@ -45,6 +46,7 @@ const RESOURCE_TYPES = {
   peering: 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings',
   applicationGateway: 'Microsoft.Network/applicationGateways',
   bastionHost: 'Microsoft.Network/bastionHosts',
+  vpnGateway: 'Microsoft.Network/virtualNetworkGateways',
 } as const;
 
 // ─── Parser ─────────────────────────────────────────────────────────────────
@@ -61,6 +63,7 @@ export function parseBicepFile(content: string, options: BicepParseOptions): Par
   const firewalls: AzureFirewall[] = [];
   const applicationGateways: ApplicationGateway[] = [];
   const bastionHosts: BastionHost[] = [];
+  const vpnGateways: VpnGateway[] = [];
   const peerings: Array<{ vnetName: string; peering: VNetPeering }> = [];
 
   const resources = extractResources(content, options.filePath);
@@ -91,6 +94,9 @@ export function parseBicepFile(content: string, options: BicepParseOptions): Par
       case RESOURCE_TYPES.bastionHost:
         bastionHosts.push(parseBastionHost(res));
         break;
+      case RESOURCE_TYPES.vpnGateway:
+        vpnGateways.push(parseVpnGateway(res));
+        break;
     }
   }
 
@@ -110,6 +116,7 @@ export function parseBicepFile(content: string, options: BicepParseOptions): Par
     firewalls,
     applicationGateways,
     bastionHosts,
+    vpnGateways,
     connections: [],
   };
 }
@@ -464,6 +471,21 @@ function parseBastionHost(res: RawResource): BastionHost {
     id: res.symbolicName,
     name,
     skuName: skuName as BastionHost['skuName'],
+    sourceLocation: { filePath: res.filePath, line: res.line },
+  };
+}
+
+// ─── VPN Gateway Parser ─────────────────────────────────────────────────────
+
+function parseVpnGateway(res: RawResource): VpnGateway {
+  const name = extractStringProperty(res.body, 'name') ?? res.symbolicName;
+  const skuName = extractStringProperty(res.body, 'name') ?? 'VpnGw1'; // sku.name
+  const gatewayType = extractStringProperty(res.body, 'gatewayType') ?? 'Vpn';
+  const vpnType = extractStringProperty(res.body, 'vpnType') ?? 'RouteBased';
+  const generation = extractStringProperty(res.body, 'vpnGatewayGeneration');
+  return {
+    id: res.symbolicName, name, skuName, gatewayType, vpnType,
+    vpnGatewayGeneration: generation,
     sourceLocation: { filePath: res.filePath, line: res.line },
   };
 }
