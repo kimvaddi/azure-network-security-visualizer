@@ -1,0 +1,29 @@
+# Build outputs
+out/
+dist/
+*.vsix
+
+# Dependencies
+node_modules/
+
+# IDE
+.vscode-test/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# ========================
+# PRIVATE - Dev Only Files
+# ========================
+prompts.txt
+runbook/
+src/test/
+test-results/
+playwright-report/
+.playwright/
+*.test.ts
+*.spec.ts
+coverage/
+.nyc_output/
+lessons-learned/

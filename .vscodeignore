@@ -1,0 +1,56 @@
+# Source code (bundled by esbuild into dist/)
+src/**
+
+# Build config
+tsconfig.json
+tsconfig.test.json
+esbuild.js
+.eslintrc*
+.prettierrc*
+
+# Sourcemaps (not needed in production)
+dist/**/*.map
+
+# Dependencies (bundled by esbuild, except Azure SDKs which are lazy-loaded)
+node_modules/**
+!node_modules/@azure/**
+!node_modules/@azure/identity/**
+!node_modules/@azure/arm-resourcegraph/**
+!node_modules/@azure/arm-resources-subscriptions/**
+!node_modules/@azure/core-auth/**
+!node_modules/@azure/core-client/**
+!node_modules/@azure/core-rest-pipeline/**
+!node_modules/@azure/core-util/**
+!node_modules/@azure/core-tracing/**
+!node_modules/@azure/abort-controller/**
+!node_modules/@azure/logger/**
+!node_modules/tslib/**
+
+# Development
+.vscode/**
+.github/**
+.vscode-test/**
+
+# Private files
+prompts.txt
+runbook/**
+lessons-learned/**
+coverage/**
+.nyc_output/**
+test-results/**
+playwright-report/**
+.playwright/**
+
+# Build artifacts (only dist/ is needed)
+out/**
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/**
+.gitignore
+
+# Package artifacts
+*.vsix

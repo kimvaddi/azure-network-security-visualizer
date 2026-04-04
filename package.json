@@ -1,0 +1,217 @@
+{
+  "name": "azure-network-security-visualizer",
+  "displayName": "Azure Network Security Visualizer",
+  "description": "Parse Bicep/ARM networking resources and render interactive topology diagrams with security analysis. Visualize VNets, subnets, NSGs, firewalls, Private Endpoints, and route tables. Detect misconfigurations before deployment.",
+  "version": "0.1.0",
+  "publisher": "KimVaddi",
+  "author": {
+    "name": "KimVaddi"
+  },
+  "license": "MIT",
+  "icon": "media/icons/extension-icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KimVaddi/azure-network-security-visualizer"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Azure",
+    "Visualization",
+    "Linters",
+    "Other"
+  ],
+  "keywords": [
+    "azure",
+    "network",
+    "security",
+    "nsg",
+    "firewall",
+    "bicep",
+    "arm",
+    "topology",
+    "vnet",
+    "private-endpoint",
+    "subnet",
+    "route-table",
+    "visualization",
+    "security-audit",
+    "network-watcher",
+    "cloud-security"
+  ],
+  "activationEvents": [
+    "onLanguage:bicep",
+    "onLanguage:json",
+    "onLanguage:arm-template",
+    "workspaceContains:**/*.bicep",
+    "workspaceContains:**/*.json",
+    "onCommand:azureNetSec.connectAzure",
+    "onCommand:azureNetSec.visualizeLive"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "azureNetSec.visualize",
+        "title": "Visualize Network Topology",
+        "category": "Azure NetSec",
+        "icon": {
+          "light": "media/icons/topology-light.svg",
+          "dark": "media/icons/topology-dark.svg"
+        }
+      },
+      {
+        "command": "azureNetSec.analyzeFile",
+        "title": "Analyze Current File",
+        "category": "Azure NetSec"
+      },
+      {
+        "command": "azureNetSec.analyzeWorkspace",
+        "title": "Analyze Workspace Security",
+        "category": "Azure NetSec"
+      },
+      {
+        "command": "azureNetSec.exportReport",
+        "title": "Export Security Report",
+        "category": "Azure NetSec"
+      },
+      {
+        "command": "azureNetSec.showEffectiveRules",
+        "title": "Show Effective Rules for Resource",
+        "category": "Azure NetSec"
+      },
+      {
+        "command": "azureNetSec.connectAzure",
+        "title": "Sign In to Azure (Entra ID)",
+        "category": "Azure NetSec"
+      },
+      {
+        "command": "azureNetSec.visualizeLive",
+        "title": "Visualize Live Azure Topology",
+        "category": "Azure NetSec",
+        "icon": {
+          "light": "media/icons/topology-light.svg",
+          "dark": "media/icons/topology-dark.svg"
+        }
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "azureNetSec.visualize",
+          "when": "resourceLangId == bicep || resourceLangId == json",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "azureNetSec.analyzeFile",
+          "when": "resourceLangId == bicep || resourceLangId == json",
+          "group": "azureNetSec@1"
+        },
+        {
+          "command": "azureNetSec.showEffectiveRules",
+          "when": "resourceLangId == bicep || resourceLangId == json",
+          "group": "azureNetSec@2"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "azureNetSec.analyzeWorkspace",
+          "group": "azureNetSec@1"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Azure Network Security Visualizer",
+      "properties": {
+        "azureNetSec.severityThreshold": {
+          "type": "string",
+          "default": "warning",
+          "enum": [
+            "critical",
+            "high",
+            "warning",
+            "info"
+          ],
+          "description": "Minimum severity level for flagged issues."
+        },
+        "azureNetSec.autoAnalyzeOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically analyze Bicep/ARM files on save."
+        },
+        "azureNetSec.showInlineDecorations": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show inline security warnings in the editor."
+        },
+        "azureNetSec.reportFormat": {
+          "type": "string",
+          "default": "html",
+          "enum": [
+            "html",
+            "markdown",
+            "json"
+          ],
+          "description": "Default export format for security reports."
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "azureNetSec",
+          "title": "Azure Network Security",
+          "icon": "media/icons/shield.svg"
+        }
+      ]
+    },
+    "views": {
+      "azureNetSec": [
+        {
+          "id": "azureNetSec.findings",
+          "name": "Security Findings"
+        },
+        {
+          "id": "azureNetSec.topology",
+          "name": "Network Resources"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "package": "node esbuild.js --production",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "test:unit": "mocha --require ts-node/register 'src/test/**/*.test.ts'",
+    "pretest": "tsc -p ./tsconfig.test.json",
+    "generate-icons": "node scripts/generate-icons.js"
+  },
+  "devDependencies": {
+    "@types/d3": "^7.4.3",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "@vscode/test-electron": "^2.3.8",
+    "@vscode/vsce": "^2.22.0",
+    "esbuild": "^0.20.0",
+    "eslint": "^8.56.0",
+    "mocha": "^10.3.0",
+    "sharp": "^0.34.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@azure/arm-resourcegraph": "^4.2.1",
+    "@azure/arm-resources-subscriptions": "^2.1.0",
+    "@azure/identity": "^4.13.1",
+    "d3": "^7.9.0"
+  }
+}
