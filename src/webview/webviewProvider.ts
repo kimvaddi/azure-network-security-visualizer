@@ -1048,6 +1048,9 @@ export class TopologyWebviewProvider {
       'NETSEC-012': { action: '✅ ADVISORY', guidance: 'Consider Service Tags instead of hardcoded IPs — auto-updated by Microsoft.', safe: true },
       'NETSEC-013': { action: '✅ ADVISORY', guidance: 'Review overlapping rules — higher priority rule wins. Confirm intent.', safe: true },
       'NETSEC-014': { action: '🟡 IMPROVE', guidance: 'Route through Azure Firewall for inspection instead of direct internet.', safe: false },
+      'NETSEC-015': { action: '🟠 REVIEW', guidance: 'Enable Azure DDoS Protection on this VNet. Required for Zero Trust.', safe: false },
+      'NETSEC-016': { action: '🟡 IMPROVE', guidance: 'Add AzureBastionSubnet and deploy Bastion for secure VM access without open ports.', safe: true },
+      'NETSEC-017': { action: '🟡 IMPROVE', guidance: 'Add Private DNS Zone Group so DNS resolves to the private IP, not public.', safe: true },
     };
 
     function renderActionGroups() {

@@ -19,6 +19,7 @@ import {
   Subnet,
   RouteTable,
   AzureFirewall,
+  PrivateEndpoint,
 } from '../models/networkModel';
 
 // ─── Rule IDs ───────────────────────────────────────────────────────────────
@@ -38,6 +39,9 @@ export const RULE_IDS = {
   HARDCODED_IP: 'NETSEC-012',
   OVERLAPPING_RULES: 'NETSEC-013',
   DEFAULT_ROUTE_INTERNET: 'NETSEC-014',
+  VNET_NO_DDOS: 'NETSEC-015',
+  NO_BASTION_SUBNET: 'NETSEC-016',
+  PE_NO_DNS_ZONE: 'NETSEC-017',
 } as const;
 
 // ─── Analyzer ───────────────────────────────────────────────────────────────
@@ -63,6 +67,16 @@ export function analyzeTopology(topology: NetworkTopology): SecurityFinding[] {
   // Analyze firewalls
   for (const fw of topology.firewalls) {
     findings.push(...analyzeFirewall(fw));
+  }
+
+  // Zero Trust: Analyze VNets for DDoS and Bastion
+  for (const vnet of topology.vnets) {
+    findings.push(...analyzeVNetZeroTrust(vnet));
+  }
+
+  // Zero Trust: Analyze Private Endpoints for DNS zones
+  for (const pe of topology.privateEndpoints) {
+    findings.push(...analyzePrivateEndpointDns(pe));
   }
 
   // Sort by severity
@@ -339,6 +353,74 @@ function analyzeFirewall(fw: AzureFirewall): SecurityFinding[] {
       resourceName: fw.name,
       line: fw.sourceLocation?.line,
       filePath: fw.sourceLocation?.filePath,
+    });
+  }
+
+  return findings;
+}
+
+// ─── Zero Trust: VNet Analysis (DDoS + Bastion) ────────────────────────────
+
+function analyzeVNetZeroTrust(vnet: VirtualNetwork): SecurityFinding[] {
+  const findings: SecurityFinding[] = [];
+
+  // NETSEC-015: VNet without DDoS Protection
+  if (!vnet.enableDdosProtection) {
+    findings.push({
+      id: RULE_IDS.VNET_NO_DDOS,
+      severity: 'high',
+      title: `VNet "${vnet.name}" does not have DDoS Protection enabled`,
+      description: `Virtual Network "${vnet.name}" does not have Azure DDoS Protection enabled. Public IP addresses in this VNet are vulnerable to volumetric and protocol DDoS attacks.`,
+      recommendation: 'Enable Azure DDoS Network Protection or DDoS IP Protection on this VNet. This is a Zero Trust requirement for all internet-facing workloads. Ref: https://learn.microsoft.com/azure/ddos-protection/manage-ddos-protection',
+      learnMoreUrl: 'https://learn.microsoft.com/azure/networking/security/zero-trust-ddos-protection',
+      resourceId: vnet.id,
+      resourceType: 'Microsoft.Network/virtualNetworks',
+      resourceName: vnet.name,
+      line: vnet.sourceLocation?.line,
+      filePath: vnet.sourceLocation?.filePath,
+    });
+  }
+
+  // NETSEC-016: No Azure Bastion subnet in VNet
+  const hasBastionSubnet = vnet.subnets.some(s => s.name.toLowerCase() === 'azurebastionsubnet');
+  if (!hasBastionSubnet && vnet.subnets.length > 0) {
+    findings.push({
+      id: RULE_IDS.NO_BASTION_SUBNET,
+      severity: 'warning',
+      title: `VNet "${vnet.name}" has no Azure Bastion subnet`,
+      description: `Virtual Network "${vnet.name}" does not contain an AzureBastionSubnet. Without Azure Bastion, VM access requires open SSH/RDP ports (NETSEC-001/002) or a VPN.`,
+      recommendation: 'Add an AzureBastionSubnet (minimum /26) and deploy Azure Bastion for secure, browser-based VM access without exposing management ports. Ref: https://learn.microsoft.com/azure/bastion/bastion-overview',
+      learnMoreUrl: 'https://learn.microsoft.com/azure/bastion/bastion-overview',
+      resourceId: vnet.id,
+      resourceType: 'Microsoft.Network/virtualNetworks',
+      resourceName: vnet.name,
+      line: vnet.sourceLocation?.line,
+      filePath: vnet.sourceLocation?.filePath,
+    });
+  }
+
+  return findings;
+}
+
+// ─── Zero Trust: Private Endpoint DNS Analysis ──────────────────────────────
+
+function analyzePrivateEndpointDns(pe: PrivateEndpoint): SecurityFinding[] {
+  const findings: SecurityFinding[] = [];
+
+  // NETSEC-017: Private Endpoint without DNS zone group
+  if (!pe.privateDnsZoneGroup) {
+    findings.push({
+      id: RULE_IDS.PE_NO_DNS_ZONE,
+      severity: 'warning',
+      title: `Private Endpoint "${pe.name}" has no DNS zone group configured`,
+      description: `Private Endpoint "${pe.name}" does not have a Private DNS Zone Group. Without proper DNS configuration, clients may still resolve to the public IP of the service instead of the private endpoint IP.`,
+      recommendation: 'Configure a Private DNS Zone Group on this Private Endpoint to ensure DNS resolution points to the private IP. This is critical for Zero Trust — traffic should never leave the VNet. Ref: https://learn.microsoft.com/azure/private-link/private-endpoint-dns',
+      learnMoreUrl: 'https://learn.microsoft.com/azure/private-link/private-endpoint-dns',
+      resourceId: pe.id,
+      resourceType: 'Microsoft.Network/privateEndpoints',
+      resourceName: pe.name,
+      line: pe.sourceLocation?.line,
+      filePath: pe.sourceLocation?.filePath,
     });
   }
 

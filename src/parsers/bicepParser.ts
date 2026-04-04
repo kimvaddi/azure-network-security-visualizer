@@ -231,6 +231,7 @@ function parseVNet(res: RawResource): VirtualNetwork {
   const name = extractStringProperty(res.body, 'name') ?? res.symbolicName;
   const location = extractStringProperty(res.body, 'location');
   const addressSpace = extractArrayProperty(res.body, 'addressPrefixes');
+  const enableDdosProtection = extractBoolProperty(res.body, 'enableDdosProtection');
 
   const subnetBlocks = extractNestedBlocks(res.body, 'subnets');
   const subnets: Subnet[] = subnetBlocks.map((block, idx) => parseSubnet(block, `${name}-subnet-${idx}`, res.filePath, res.line));
@@ -242,6 +243,7 @@ function parseVNet(res: RawResource): VirtualNetwork {
     addressSpace,
     subnets,
     peerings: [],
+    enableDdosProtection: enableDdosProtection || undefined,
     sourceLocation: { filePath: res.filePath, line: res.line },
   };
 }
@@ -383,12 +385,17 @@ function parsePrivateEndpoint(res: RawResource): PrivateEndpoint {
   const privateLinkServiceId = extractReferenceId(res.body, 'privateLinkServiceConnection') ?? '';
   const groupIds = extractArrayProperty(res.body, 'groupIds');
 
+  // Check for privateDnsZoneGroups nested resource or property
+  const hasDnsZone = res.body.includes('privateDnsZoneGroups') || res.body.includes('privateDnsZone');
+  const dnsZoneName = extractStringProperty(res.body, 'privateDnsZoneId') ?? (hasDnsZone ? 'configured' : undefined);
+
   return {
     id: res.symbolicName,
     name,
     subnetId,
     privateLinkServiceId,
     groupIds,
+    privateDnsZoneGroup: dnsZoneName,
     sourceLocation: { filePath: res.filePath, line: res.line },
   };
 }

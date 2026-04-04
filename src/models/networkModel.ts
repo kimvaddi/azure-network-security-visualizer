@@ -97,6 +97,8 @@ export interface VirtualNetwork {
   subnets: Subnet[];
   /** Peering connections */
   peerings: VNetPeering[];
+  /** DDoS Protection enabled (Zero Trust: NS-1) */
+  enableDdosProtection?: boolean;
   sourceLocation?: { filePath: string; line: number };
 }
 

@@ -200,6 +200,7 @@ function parseArmVNet(resource: ArmResource, filePath: string, line: number): Vi
     addressSpace: addressSpace?.addressPrefixes ?? [],
     subnets,
     peerings: [],
+    enableDdosProtection: getProp<boolean>(props, 'enableDdosProtection') ?? undefined,
     sourceLocation: { filePath, line },
   };
 }
@@ -280,12 +281,17 @@ function parseArmPrivateEndpoint(resource: ArmResource, filePath: string, line: 
     groupIds = getProp<string[]>(plscProps, 'groupIds') ?? [];
   }
 
+  // Check for privateDnsZoneGroups
+  const dnsZoneGroups = getProp<Array<Record<string, unknown>>>(props, 'privateDnsZoneGroups');
+  const privateDnsZoneGroup = dnsZoneGroups && dnsZoneGroups.length > 0 ? 'configured' : undefined;
+
   return {
     id: resource.name,
     name: resource.name,
     subnetId: subnet?.id ?? '',
     privateLinkServiceId,
     groupIds,
+    privateDnsZoneGroup,
     sourceLocation: { filePath, line },
   };
 }
