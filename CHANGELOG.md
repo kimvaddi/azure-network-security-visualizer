@@ -6,17 +6,23 @@ All notable changes to Azure Network Security Visualizer will be documented here
 
 ### Added
 - Initial release
-- Bicep file parser for Azure networking resources
-- ARM template JSON parser
-- Interactive network topology webview diagram
-- Security analyzer with 14 rules based on Microsoft Security Benchmark
-- Security findings sidebar with severity indicators
-- VS Code diagnostics integration (inline warnings)
+- Bicep file parser for Azure networking resources (VNets, Subnets, NSGs, Route Tables, PEs, Firewalls, Peerings)
+- ARM template JSON parser with line number tracking
+- Professional 2.5D topology webview — glassmorphism cards, gradient icons, depth shadows, hover animations
+- Security analyzer with 14 rules (NETSEC-001–014) based on Microsoft Security Benchmark
+- Security posture assessment — instant summary with action groups (Fix Now / Review / Improve / Safe)
+- Actionable guidance per rule — tells you what to do, not just what's wrong
+- Findings deduplicated by rule ID with affected resource counts
+- Live Azure topology via Entra ID authentication — cross-subscription Resource Graph queries
+- Multi-subscription picker — scan all subscriptions in your tenant
+- Mermaid diagram export — generates `.mmd` from topology with styled nodes and edges
+- Security report export — CSV (Excel), HTML, Markdown, JSON via toolbar button
+- VS Code diagnostics integration (inline warnings with clickable MS Learn links)
 - Status bar security posture indicator
 - Activity bar panel with findings tree view
-- Security report export (HTML, Markdown, JSON)
 - Auto-analyze on file save
 - Click-to-source navigation from findings
 - Effective rules viewer for NSGs
-- MS Learn documentation links in all findings
-- Support for: VNets, Subnets, NSGs, Route Tables, Private Endpoints, Azure Firewall
+- MS Learn links validated via Microsoft documentation (all 14 rules)
+- VNet Peering parsing (Bicep standalone resources)
+- 85 unit tests across 4 suites

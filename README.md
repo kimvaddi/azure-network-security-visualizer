@@ -406,11 +406,20 @@ Connect to your real Azure environment and visualize deployed resources across *
 ## Features
 
 ### 🌐 Interactive Network Topology
-- Visual map of your entire Azure network architecture
-- VNets, Subnets, NSGs, Route Tables, Firewalls, Private Endpoints, VNet Peerings
-- Connection lines showing relationships (subnet→NSG, peering, private endpoints)
+- **Professional 2.5D visual design** — glassmorphism cards, gradient icons, depth shadows, hover animations
+- Dot-grid background with color-coded resource cards (blue=VNet, green=subnet, orange=NSG, red=firewall, purple=PE)
+- VNets rendered as perspective-shifted containers with glow effects
+- Subnet cards with accent bars — green for healthy, red for security issues
+- Connection lines between subnets, NSGs, route tables, and private endpoints
 - Click any NSG to inspect its security rules sorted by priority
 - Zoom, pan, and navigate the topology
+
+### 📐 Mermaid Diagram Export
+- Click **📐 Mermaid** in the toolbar to generate a `.mmd` diagram from your topology
+- VNets as subgraphs, resources as styled nodes, connections as edges
+- Color-coded node classes: danger (red), NSG (orange), firewall (red), PE (purple)
+- Copy to clipboard for pasting into GitHub README, Confluence, or any Markdown doc
+- Install the [Mermaid Preview](https://marketplace.visualstudio.com/items?itemName=bierner.markdown-mermaid) extension for live rendering in VS Code
 
 ### 🛡️ Security Analysis Engine (14 Rules)
 Automatically detects misconfigurations based on [Microsoft Security Benchmark](https://learn.microsoft.com/security/benchmark/azure/overview). Runs offline — no Azure subscription required.
