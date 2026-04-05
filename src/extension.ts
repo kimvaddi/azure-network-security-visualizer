@@ -56,15 +56,20 @@ export function activate(context: vscode.ExtensionContext) {
   findingsTreeProvider = new FindingsTreeDataProvider();
   vscode.window.registerTreeDataProvider('azureNetSec.findings', findingsTreeProvider);
 
-  // Register commands
+  // Register welcome view
+  const welcomeProvider = new WelcomeViewProvider();
+  vscode.window.registerWebviewViewProvider('azureNetSec.welcome', welcomeProvider);
+
+  // Register commands — Live Azure first, code analysis second
   context.subscriptions.push(
+    vscode.commands.registerCommand('azureNetSec.connectAzure', () => commandConnectAzure()),
+    vscode.commands.registerCommand('azureNetSec.assessPosture', () => commandAssessPosture()),
+    vscode.commands.registerCommand('azureNetSec.visualizeLive', () => commandVisualizeLive()),
+    vscode.commands.registerCommand('azureNetSec.exportReport', () => commandExportReport()),
+    vscode.commands.registerCommand('azureNetSec.showEffectiveRules', () => commandShowEffectiveRules()),
     vscode.commands.registerCommand('azureNetSec.visualize', () => commandVisualize()),
     vscode.commands.registerCommand('azureNetSec.analyzeFile', () => commandAnalyzeFile()),
     vscode.commands.registerCommand('azureNetSec.analyzeWorkspace', () => commandAnalyzeWorkspace()),
-    vscode.commands.registerCommand('azureNetSec.exportReport', () => commandExportReport()),
-    vscode.commands.registerCommand('azureNetSec.showEffectiveRules', () => commandShowEffectiveRules()),
-    vscode.commands.registerCommand('azureNetSec.connectAzure', () => commandConnectAzure()),
-    vscode.commands.registerCommand('azureNetSec.visualizeLive', () => commandVisualizeLive()),
   );
 
   // Auto-analyze on save (if enabled)
@@ -264,6 +269,102 @@ async function commandConnectAzure(): Promise<void> {
       commandVisualizeLive();
     }
   });
+}
+
+// ─── Command: Assess Security Posture (Primary Live Workflow) ───────────────
+
+async function commandAssessPosture(): Promise<void> {
+  let auth: typeof import('./azure/azureAuth');
+  let live: typeof import('./azure/liveTopology');
+  try {
+    auth = require('./azure/azureAuth');
+    live = require('./azure/liveTopology');
+  } catch (err) {
+    vscode.window.showErrorMessage('Azure SDK failed to load. Ensure node_modules are installed.');
+    return;
+  }
+
+  // Authenticate if needed
+  if (!azureSession) {
+    azureSession = (await auth.authenticateAzure()) ?? undefined;
+    if (!azureSession) { return; }
+  }
+
+  // Let user pick subscriptions
+  const selectedSubs = await auth.pickSubscriptions(azureSession.subscriptions);
+  if (selectedSubs.length === 0) {
+    vscode.window.showWarningMessage('No subscriptions selected.');
+    return;
+  }
+
+  const result = await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: '🛡️ Assessing Azure Security Posture...',
+      cancellable: false,
+    },
+    async (progress) => {
+      try {
+        progress.report({ message: 'Connecting to Azure Resource Graph...' });
+        const topology = await live.fetchLiveTopology(
+          azureSession!.credential,
+          selectedSubs,
+          (p) => progress.report({ message: p.message }),
+        );
+
+        resolveConnections(topology);
+
+        progress.report({ message: 'Running 26 Zero Trust security checks...' });
+        const findings = analyzeTopology(topology);
+
+        return {
+          topology,
+          findings,
+          parsedFiles: selectedSubs.map(s => `azure://${s.subscriptionId}`),
+          parseErrors: [],
+        } as ParseResult;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('[Azure NetSec] Posture assessment failed:', msg);
+        vscode.window.showErrorMessage(`Assessment failed: ${msg}`);
+        return undefined;
+      }
+    }
+  );
+
+  if (!result) { return; }
+
+  lastParseResult = result;
+  webviewProvider.show(result.topology, result.findings);
+  findingsTreeProvider.update(result.findings);
+  updateStatusBar(result.findings);
+
+  // Show posture summary
+  const counts = { critical: 0, high: 0, warning: 0, info: 0 };
+  result.findings.forEach(f => counts[f.severity as keyof typeof counts]++);
+  const total = result.findings.length;
+
+  const subNames = selectedSubs.map(s => s.displayName).join(', ');
+  let postureGrade: string;
+  if (counts.critical > 0) {
+    postureGrade = '🔴 CRITICAL — Immediate action required';
+  } else if (counts.high > 0) {
+    postureGrade = '🟠 AT RISK — High-severity issues found';
+  } else if (counts.warning > 0) {
+    postureGrade = '🟡 FAIR — Best practice improvements available';
+  } else {
+    postureGrade = '🟢 STRONG — Aligned with Microsoft Zero Trust';
+  }
+
+  const action = await vscode.window.showInformationMessage(
+    `Security Posture: ${postureGrade}\n${total} findings across [${subNames}]\n${result.topology.vnets.length} VNets, ${result.topology.nsgs.length} NSGs`,
+    'Export Report',
+    'View Details'
+  );
+
+  if (action === 'Export Report') {
+    await commandExportReport();
+  }
 }
 
 // ─── Command: Visualize Live Topology ───────────────────────────────────────
@@ -681,5 +782,71 @@ class FindingsTreeDataProvider implements vscode.TreeDataProvider<FindingTreeIte
 class FindingTreeItem extends vscode.TreeItem {
   constructor(label: string, collapsibleState: vscode.TreeItemCollapsibleState) {
     super(label, collapsibleState);
+  }
+}
+
+// ─── Welcome View Provider ──────────────────────────────────────────────────
+
+class WelcomeViewProvider implements vscode.WebviewViewProvider {
+  resolveWebviewView(webviewView: vscode.WebviewView): void {
+    webviewView.webview.options = { enableScripts: true };
+    webviewView.webview.html = `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { padding: 12px; font-family: var(--vscode-font-family); color: var(--vscode-foreground); }
+    h2 { font-size: 14px; margin-bottom: 12px; }
+    .action-btn {
+      display: block; width: 100%; padding: 10px; margin: 8px 0;
+      border: none; border-radius: 6px; cursor: pointer;
+      font-size: 12px; font-weight: 600; text-align: left;
+    }
+    .primary {
+      background: linear-gradient(135deg, #0078d4, #005a9e);
+      color: white;
+    }
+    .primary:hover { background: linear-gradient(135deg, #1a8ae6, #0068b8); }
+    .secondary {
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      border: 1px solid var(--vscode-button-border, transparent);
+    }
+    .secondary:hover { background: var(--vscode-button-secondaryHoverBackground); }
+    .divider { border-top: 1px solid var(--vscode-panel-border); margin: 16px 0; }
+    .desc { font-size: 11px; color: var(--vscode-descriptionForeground); margin-bottom: 4px; }
+    .section-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--vscode-descriptionForeground); margin: 12px 0 4px; }
+  </style>
+</head>
+<body>
+  <h2>🛡️ Azure Network Security</h2>
+
+  <div class="section-label">Live Azure (Primary)</div>
+  <div class="desc">Connect via Entra ID to assess your deployed infrastructure</div>
+  <button class="action-btn primary" onclick="action('assessPosture')">🔍 Assess Security Posture</button>
+  <button class="action-btn secondary" onclick="action('connectAzure')">🔑 Sign In to Azure</button>
+  <button class="action-btn secondary" onclick="action('visualizeLive')">🌐 Visualize Live Topology</button>
+
+  <div class="divider"></div>
+
+  <div class="section-label">Pre-Deployment (Secondary)</div>
+  <div class="desc">Analyze Bicep/ARM templates before deploying</div>
+  <button class="action-btn secondary" onclick="action('visualize')">📄 Analyze Bicep/ARM Files</button>
+
+  <div class="divider"></div>
+
+  <button class="action-btn secondary" onclick="action('exportReport')">📊 Export Report</button>
+
+  <script>
+    const vscode = acquireVsCodeApi();
+    function action(cmd) { vscode.postMessage({ command: cmd }); }
+  </script>
+</body>
+</html>`;
+
+    webviewView.webview.onDidReceiveMessage((msg) => {
+      if (msg.command) {
+        vscode.commands.executeCommand('azureNetSec.' + msg.command);
+      }
+    });
   }
 }

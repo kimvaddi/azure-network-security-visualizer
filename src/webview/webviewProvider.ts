@@ -728,6 +728,17 @@ export class TopologyWebviewProvider {
       padding: 16px;
       border-bottom: 1px solid var(--border);
     }
+    .score-row { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+    .score-circle {
+      width: 56px; height: 56px; border-radius: 50%;
+      border: 3px solid var(--accent);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .score-grade { font-size: 18px; font-weight: 800; line-height: 1; }
+    .score-num { font-size: 10px; color: var(--fg-secondary); }
+    .score-detail { flex: 1; }
+    .posture-scope { font-size: 10px; color: var(--fg-secondary); margin-top: 4px; font-family: monospace; }
     .posture-icon { font-size: 24px; margin-bottom: 6px; }
     .posture-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
     .posture-desc { font-size: 12px; color: var(--fg-secondary); line-height: 1.5; margin-bottom: 8px; }
@@ -986,43 +997,62 @@ export class TopologyWebviewProvider {
       findings.forEach(f => counts[f.severity]++);
       const total = findings.length;
 
+      // Calculate posture score (100 = perfect, deduct for severity)
+      const maxScore = 100;
+      const deductions = counts.critical * 10 + counts.high * 5 + counts.warning * 1;
+      const score = Math.max(0, Math.min(maxScore, maxScore - deductions));
+      let grade, gradeColor;
+      if (score >= 90) { grade = 'A'; gradeColor = 'var(--success)'; }
+      else if (score >= 75) { grade = 'B'; gradeColor = '#22d3ee'; }
+      else if (score >= 60) { grade = 'C'; gradeColor = 'var(--warning)'; }
+      else if (score >= 40) { grade = 'D'; gradeColor = 'var(--high)'; }
+      else { grade = 'F'; gradeColor = 'var(--critical)'; }
+
+      // Topology stats
+      const vnetCount = topology.vnets ? topology.vnets.length : 0;
+      const nsgCount = topology.nsgs ? topology.nsgs.length : 0;
+      const subnetCount = topology.vnets ? topology.vnets.reduce(function(s,v){ return s + v.subnets.length; }, 0) : 0;
+      const fwCount = topology.firewalls ? topology.firewalls.length : 0;
+
       if (total === 0) {
         el.innerHTML = '<div class="posture-card posture-good">' +
-          '<div class="posture-icon">✅</div>' +
-          '<div class="posture-title">Excellent Security Posture</div>' +
-          '<div class="posture-desc">No misconfigurations detected. Your network aligns with Microsoft Security Benchmark.</div>' +
+          '<div class="score-row"><div class="score-circle" style="border-color:var(--success)"><span class="score-grade">A</span><span class="score-num">100</span></div>' +
+          '<div class="score-detail"><div class="posture-title">Excellent Security Posture</div><div class="posture-desc">Zero Trust aligned. No misconfigurations detected across ' + vnetCount + ' VNets, ' + nsgCount + ' NSGs.</div></div></div>' +
           '</div>';
         return;
       }
 
-      // Determine overall posture
       let postureClass, postureIcon, postureTitle, postureAction;
       if (counts.critical > 0) {
         postureClass = 'posture-critical';
         postureIcon = '🚨';
         postureTitle = 'Immediate Action Required';
-        postureAction = counts.critical + ' critical issue' + (counts.critical > 1 ? 's' : '') + ' expose your network to the internet. Fix these first.';
+        postureAction = counts.critical + ' critical issue' + (counts.critical > 1 ? 's' : '') + ' expose resources to the internet. Fix before anything else.';
       } else if (counts.high > 0) {
         postureClass = 'posture-high';
         postureIcon = '⚠️';
         postureTitle = 'Action Recommended';
-        postureAction = counts.high + ' high-severity issue' + (counts.high > 1 ? 's' : '') + ' weaken your security posture. Review and remediate.';
+        postureAction = counts.high + ' high-severity issue' + (counts.high > 1 ? 's' : '') + ' weaken your security posture. Remediate promptly.';
       } else if (counts.warning > 0) {
         postureClass = 'posture-warning';
         postureIcon = '💡';
         postureTitle = 'Good — Minor Improvements Available';
-        postureAction = 'No critical or high issues. ' + counts.warning + ' best-practice improvement' + (counts.warning > 1 ? 's' : '') + ' available.';
+        postureAction = 'No critical or high issues. ' + counts.warning + ' best-practice improvement' + (counts.warning > 1 ? 's' : '') + ' for Zero Trust alignment.';
       } else {
         postureClass = 'posture-info';
         postureIcon = '✅';
-        postureTitle = 'Good Security Posture';
-        postureAction = 'Only informational advisories. Your network follows Microsoft best practices.';
+        postureTitle = 'Strong Security Posture';
+        postureAction = 'Only informational advisories. Your network follows Microsoft Zero Trust best practices.';
       }
 
       el.innerHTML = '<div class="posture-card ' + postureClass + '">' +
-        '<div class="posture-icon">' + postureIcon + '</div>' +
-        '<div class="posture-title">' + postureTitle + '</div>' +
+        '<div class="score-row">' +
+        '<div class="score-circle" style="border-color:' + gradeColor + '"><span class="score-grade">' + grade + '</span><span class="score-num">' + score + '</span></div>' +
+        '<div class="score-detail">' +
+        '<div class="posture-title">' + postureIcon + ' ' + postureTitle + '</div>' +
         '<div class="posture-desc">' + postureAction + '</div>' +
+        '<div class="posture-scope">' + vnetCount + ' VNets · ' + subnetCount + ' Subnets · ' + nsgCount + ' NSGs · ' + fwCount + ' Firewalls</div>' +
+        '</div></div>' +
         '<div class="posture-counts">' +
         (counts.critical > 0 ? '<span class="badge critical">' + counts.critical + ' Critical</span>' : '') +
         (counts.high > 0 ? '<span class="badge high">' + counts.high + ' High</span>' : '') +

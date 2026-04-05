@@ -34,18 +34,17 @@
 
 ## What Is This?
 
-When you write Azure infrastructure code (called **Bicep** or **ARM templates**), you define networking resources like firewalls, security rules, and virtual networks. But it's nearly impossible to spot security mistakes just by reading the code.
+A **Zero Trust network security assessment tool** built into VS Code. Connect to your Azure environment via Entra ID and instantly get a security posture grade — with specific remediation steps for every finding, aligned to [Microsoft Security Benchmark](https://learn.microsoft.com/security/benchmark/azure/overview) and [Azure Zero Trust networking](https://learn.microsoft.com/security/zero-trust/azure-networking-overview).
 
-This extension **reads your infrastructure code** and:
+### Primary: Live Azure Assessment (Enterprise)
+1. ☁️ **Connect via Entra ID** — sign in, pick subscriptions across your tenant
+2. 🔍 **Assess Security Posture** — runs 26 Zero Trust checks against your deployed resources
+3. 🛡️ **Get a posture grade** (A–F) with actionable fix guidance per finding
+4. 📊 **Export reports** — CSV for Excel, HTML for management, Markdown for Git
 
-1. 🌐 **Draws a visual map** of your entire network — VNets, subnets, NSGs, firewalls, private endpoints
-2. 🛡️ **Flags security issues** — open ports, missing firewalls, overly permissive rules
-3. 📊 **Generates a report** — HTML, Markdown, or JSON for sharing with your team
-4. ☁️ **Connects to live Azure** — Sign in with Entra ID, scan across subscriptions, and visualize your deployed network topology
-
-**Two modes:**
-- **Offline mode** — Analyze Bicep/ARM files locally. No Azure account required.
-- **Live mode** — Sign in via Entra ID, pick subscriptions, and visualize your actual deployed network.
+### Secondary: Pre-Deployment Analysis
+5. 📄 **Analyze Bicep/ARM templates** before deploying — catch issues in code review
+6. 🌐 **Interactive topology map** — visualize VNets, subnets, NSGs, firewalls, peerings
 
 ---
 
@@ -53,8 +52,10 @@ This extension **reads your infrastructure code** and:
 
 | Role | How You Benefit |
 |------|-----------------|
+| **Security Teams** | One-click posture assessment across all subscriptions. Export to Excel for audit. |
+| **Cloud Architects** | Validate Zero Trust alignment for existing infrastructure |
+| **Platform Engineers** | Audit network security posture before and after changes |
 | **Cloud Engineers** | Catch NSG misconfigurations before `az deployment` |
-| **Security Teams** | Audit Bicep/ARM templates for compliance |
 | **DevOps / Platform Teams** | Add security checks to your PR review process |
 | **Students / Beginners** | Learn Azure networking visually — see how VNets, subnets, and NSGs connect |
 

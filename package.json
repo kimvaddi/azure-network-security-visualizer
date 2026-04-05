@@ -41,20 +41,27 @@
     "cloud-security"
   ],
   "activationEvents": [
+    "onCommand:azureNetSec.connectAzure",
+    "onCommand:azureNetSec.visualizeLive",
+    "onCommand:azureNetSec.assessPosture",
     "onLanguage:bicep",
     "onLanguage:json",
     "onLanguage:arm-template",
     "workspaceContains:**/*.bicep",
-    "workspaceContains:**/*.json",
-    "onCommand:azureNetSec.connectAzure",
-    "onCommand:azureNetSec.visualizeLive"
+    "workspaceContains:**/*.json"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "azureNetSec.visualize",
-        "title": "Visualize Network Topology",
+        "command": "azureNetSec.connectAzure",
+        "title": "Connect to Azure (Entra ID)",
+        "category": "Azure NetSec",
+        "icon": "$(sign-in)"
+      },
+      {
+        "command": "azureNetSec.assessPosture",
+        "title": "Assess Security Posture (Live Azure)",
         "category": "Azure NetSec",
         "icon": {
           "light": "media/icons/topology-light.svg",
@@ -62,13 +69,8 @@
         }
       },
       {
-        "command": "azureNetSec.analyzeFile",
-        "title": "Analyze Current File",
-        "category": "Azure NetSec"
-      },
-      {
-        "command": "azureNetSec.analyzeWorkspace",
-        "title": "Analyze Workspace Security",
+        "command": "azureNetSec.visualizeLive",
+        "title": "Visualize Live Topology",
         "category": "Azure NetSec"
       },
       {
@@ -82,18 +84,19 @@
         "category": "Azure NetSec"
       },
       {
-        "command": "azureNetSec.connectAzure",
-        "title": "Sign In to Azure (Entra ID)",
+        "command": "azureNetSec.visualize",
+        "title": "Analyze Bicep/ARM Templates",
         "category": "Azure NetSec"
       },
       {
-        "command": "azureNetSec.visualizeLive",
-        "title": "Visualize Live Azure Topology",
-        "category": "Azure NetSec",
-        "icon": {
-          "light": "media/icons/topology-light.svg",
-          "dark": "media/icons/topology-dark.svg"
-        }
+        "command": "azureNetSec.analyzeFile",
+        "title": "Analyze Current File",
+        "category": "Azure NetSec"
+      },
+      {
+        "command": "azureNetSec.analyzeWorkspace",
+        "title": "Analyze Workspace (Bicep/ARM)",
+        "category": "Azure NetSec"
       }
     ],
     "menus": {
@@ -171,6 +174,11 @@
     },
     "views": {
       "azureNetSec": [
+        {
+          "id": "azureNetSec.welcome",
+          "name": "Get Started",
+          "type": "webview"
+        },
         {
           "id": "azureNetSec.findings",
           "name": "Security Findings"
