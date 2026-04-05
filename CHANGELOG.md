@@ -9,7 +9,7 @@ All notable changes to Azure Network Security Visualizer will be documented here
 - Bicep file parser for Azure networking resources (VNets, Subnets, NSGs, Route Tables, PEs, Firewalls, Peerings)
 - ARM template JSON parser with line number tracking
 - Professional 2.5D topology webview — glassmorphism cards, gradient icons, depth shadows, hover animations
-- Security analyzer with 14 rules (NETSEC-001–014) based on Microsoft Security Benchmark
+- Security analyzer with 26 rules (NETSEC-001–026) based on Microsoft Security Benchmark + Azure Zero Trust
 - Security posture assessment — instant summary with action groups (Fix Now / Review / Improve / Safe)
 - Actionable guidance per rule — tells you what to do, not just what's wrong
 - Findings deduplicated by rule ID with affected resource counts
@@ -25,4 +25,5 @@ All notable changes to Azure Network Security Visualizer will be documented here
 - Effective rules viewer for NSGs
 - MS Learn links validated via Microsoft documentation (all 14 rules)
 - VNet Peering parsing (Bicep standalone resources)
-- 85 unit tests across 4 suites
+- 99 unit tests across 4 suites
+- Zero Trust coverage: DDoS, Bastion, PE DNS, WAF, TLS, forced tunneling, VPN Gateway security

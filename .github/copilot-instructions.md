@@ -8,7 +8,7 @@ VS Code extension that parses Azure Bicep/ARM templates, analyzes network securi
 npm run compile        # Dev build → dist/extension.js (esbuild, sourcemaps)
 npm run watch          # Continuous rebuild on file change
 npm run package        # Production build (minified, no sourcemaps)
-npm run test:unit      # Mocha + ts-node — 85 tests across 4 suites
+npm run test:unit      # Mocha + ts-node — 99 tests across 4 suites
 npm run lint           # ESLint on src/**/*.ts
 ```
 
@@ -33,7 +33,7 @@ Bicep/ARM file → Parser → Partial<NetworkTopology> → extension.ts merges �
 | `src/models/networkModel.ts` | Pure interfaces only — `NetworkTopology`, `SecurityFinding`, `NsgRule`, etc. (18 types, zero logic) |
 | `src/parsers/bicepParser.ts` | Regex-based Bicep extraction → `Partial<NetworkTopology>` |
 | `src/parsers/armParser.ts` | JSON-based ARM template parsing → `Partial<NetworkTopology>` |
-| `src/analyzers/securityAnalyzer.ts` | 14 security rules (NETSEC-001–014) based on MS Security Benchmark |
+| `src/analyzers/securityAnalyzer.ts` | 26 security rules (NETSEC-001–026) based on MS Security Benchmark + Zero Trust |
 | `src/reports/reportGenerator.ts` | Exports findings+topology as HTML, Markdown, or JSON |
 | `src/webview/webviewProvider.ts` | Interactive D3 topology diagram in webview panel |
 | `src/azure/azureAuth.ts` | Entra ID authentication via VS Code session, subscription picker |
@@ -44,7 +44,7 @@ Bicep/ARM file → Parser → Partial<NetworkTopology> → extension.ts merges �
 
 - **Commands**: `azureNetSec.verbNoun` (camelCase, dot-namespaced). Current: `visualize`, `analyzeFile`, `analyzeWorkspace`, `exportReport`, `showEffectiveRules`, `connectAzure`, `visualizeLive`
 - **Settings**: `azureNetSec.severityThreshold`, `autoAnalyzeOnSave` (default true), `showInlineDecorations`, `reportFormat` (html/markdown/json/csv)
-- **Rule IDs**: `NETSEC-###` (zero-padded, sequential)
+- **Rule IDs**: `NETSEC-###` (zero-padded, sequential, currently 001–026)
 - **Severity**: lowercase literal union `'critical' | 'high' | 'warning' | 'info'`
 - **Exports**: Named exports only (no default exports). Models are pure interfaces, no classes.
 - **Parsers** return `Partial<NetworkTopology>`; `extension.ts` merges results across files.

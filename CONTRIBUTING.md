@@ -13,7 +13,7 @@ Thank you for your interest in contributing! This guide will help you get starte
 ```bash
 npm run compile        # Dev build
 npm run watch          # Continuous rebuild
-npm run test:unit      # Run unit tests (85 tests)
+npm run test:unit      # Run unit tests (99 tests)
 npm run lint           # ESLint
 ```
 
@@ -24,7 +24,7 @@ npm run lint           # ESLint
 | Folder | Purpose |
 |--------|---------|
 | `src/parsers/` | Bicep/ARM template parsing |
-| `src/analyzers/` | Security rule detection (NETSEC-001 through NETSEC-014) |
+| `src/analyzers/` | Security rule detection (NETSEC-001 through NETSEC-026) |
 | `src/webview/` | D3-based topology visualization |
 | `src/reports/` | HTML/Markdown/JSON/CSV report export |
 | `src/models/` | TypeScript interfaces (pure types, no logic) |

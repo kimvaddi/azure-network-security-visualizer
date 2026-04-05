@@ -454,7 +454,7 @@ Export findings directly from the webview via the **📊 Export Report** button:
 
 ## Security Rules Reference
 
-All rules are based on [Microsoft Security Benchmark](https://learn.microsoft.com/security/benchmark/azure/mcsb-v2-network-security) and [Azure Network Security Best Practices](https://learn.microsoft.com/azure/security/fundamentals/network-best-practices):
+All 26 rules are based on [Microsoft Security Benchmark](https://learn.microsoft.com/security/benchmark/azure/mcsb-v2-network-security), [Azure Zero Trust Networking](https://learn.microsoft.com/security/zero-trust/azure-networking-overview), and [Azure Network Security Best Practices](https://learn.microsoft.com/azure/security/fundamentals/network-best-practices):
 
 | Rule ID | Severity | What It Detects | Fix Guide |
 |---------|----------|-----------------|-----------|
@@ -472,6 +472,18 @@ All rules are based on [Microsoft Security Benchmark](https://learn.microsoft.co
 | NETSEC-012 | 🔵 Info | Hardcoded IPs (use Service Tags instead) | [Service Tags](https://learn.microsoft.com/azure/virtual-network/service-tags-overview) |
 | NETSEC-013 | 🔵 Info | Overlapping rules with conflicting actions | [NSG rule evaluation](https://learn.microsoft.com/azure/virtual-network/network-security-groups-overview#security-rules) |
 | NETSEC-014 | 🟡 Warning | Default route to Internet (bypasses firewall) | [UDR overview](https://learn.microsoft.com/azure/virtual-network/virtual-networks-udr-overview) |
+| NETSEC-015 | 🟠 High | VNet without DDoS Protection | [Zero Trust DDoS](https://learn.microsoft.com/azure/networking/security/zero-trust-ddos-protection) |
+| NETSEC-016 | 🟡 Warning | No Azure Bastion subnet in VNet | [Azure Bastion](https://learn.microsoft.com/azure/bastion/bastion-overview) |
+| NETSEC-017 | 🟡 Warning | Private Endpoint without DNS zone group | [PE DNS config](https://learn.microsoft.com/azure/private-link/private-endpoint-dns) |
+| NETSEC-018 | 🟠 High | Application Gateway without WAF enabled | [WAF on App Gateway](https://learn.microsoft.com/azure/web-application-firewall/ag/ag-overview) |
+| NETSEC-019 | 🟡 Warning | WAF in Detection mode (not blocking attacks) | [WAF modes](https://learn.microsoft.com/azure/web-application-firewall/ag/ag-overview) |
+| NETSEC-020 | 🟠 High | Application Gateway allows TLS below 1.2 | [TLS policy](https://learn.microsoft.com/azure/application-gateway/application-gateway-ssl-policy-overview) |
+| NETSEC-021 | 🟡 Warning | Subnet without route table (bypasses firewall) | [Forced tunneling](https://learn.microsoft.com/azure/firewall/forced-tunneling) |
+| NETSEC-022 | 🟠 High | VPN Gateway using Basic SKU (no custom crypto) | [Gateway SKUs](https://learn.microsoft.com/azure/vpn-gateway/about-gateway-skus) |
+| NETSEC-023 | 🟡 Warning | VPN Gateway is policy-based (legacy IKEv1) | [VPN settings](https://learn.microsoft.com/azure/vpn-gateway/vpn-gateway-about-vpn-gateway-settings#vpntype) |
+| NETSEC-024 | 🔵 Info | NSG rules use IPs instead of ASGs | [ASG overview](https://learn.microsoft.com/azure/virtual-network/application-security-groups) |
+| NETSEC-025 | 🔵 Info | No forced tunneling route to firewall | [Forced tunneling](https://learn.microsoft.com/azure/firewall/forced-tunneling) |
+| NETSEC-026 | 🔵 Info | Public IP without DDoS protection | [DDoS Protection](https://learn.microsoft.com/azure/ddos-protection/ddos-protection-overview) |
 
 ---
 
@@ -511,7 +523,10 @@ To change settings: **File** → **Preferences** → **Settings** → search **"
 | `Microsoft.Network/routeTables` | **Route Table** — Traffic directions: "send traffic to X via Y" |
 | `Microsoft.Network/privateEndpoints` | **Private Endpoint** — Connects to Azure services (databases, storage) over your private network instead of the public internet |
 | `Microsoft.Network/azureFirewalls` | **Azure Firewall** — A cloud-managed firewall that inspects and filters all traffic |
-| `Microsoft.Network/virtualNetworks/virtualNetworkPeerings` | **VNet Peering** — Connects two VNets so they can communicate, like building a bridge between two buildings |
+| `Microsoft.Network/applicationGateways` | **Application Gateway** — Layer 7 load balancer with optional WAF (Web Application Firewall) for web apps |
+| `Microsoft.Network/bastionHosts` | **Azure Bastion** — Secure, browser-based VM access without exposing SSH/RDP ports |
+| `Microsoft.Network/virtualNetworkGateways` | **VPN Gateway** — Encrypted tunnel between Azure and your on-premises network |
+| `Microsoft.Network/virtualNetworks/virtualNetworkPeerings` | **VNet Peering** — Connects two VNets so they can communicate, like building a bridge |
 
 ---
 
