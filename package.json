@@ -1,5 +1,5 @@
 {
-  "name": "azure-network-security-visualizer",
+  "name": "azure-netsec-visualizer",
   "displayName": "Azure Network Security Visualizer",
   "description": "Assess Azure network security posture via Entra ID. 26 Zero Trust checks across subscriptions — open ports, missing NSGs, WAF, DDoS, TLS, forced tunneling. Posture grade A–F with remediation guidance. Export to Excel/HTML/Markdown.",
   "version": "0.2.0",
