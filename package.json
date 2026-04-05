@@ -1,8 +1,8 @@
 {
   "name": "azure-network-security-visualizer",
   "displayName": "Azure Network Security Visualizer",
-  "description": "Parse Bicep/ARM networking resources and render interactive topology diagrams with security analysis. Visualize VNets, subnets, NSGs, firewalls, Private Endpoints, and route tables. Detect misconfigurations before deployment.",
-  "version": "0.1.0",
+  "description": "Assess Azure network security posture via Entra ID. 26 Zero Trust checks across subscriptions — open ports, missing NSGs, WAF, DDoS, TLS, forced tunneling. Posture grade A–F with remediation guidance. Export to Excel/HTML/Markdown.",
+  "version": "0.2.0",
   "publisher": "KimVaddi",
   "author": {
     "name": "KimVaddi"

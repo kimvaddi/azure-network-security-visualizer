@@ -2,6 +2,28 @@
 
 All notable changes to Azure Network Security Visualizer will be documented here.
 
+## [0.2.0] — 2026-04-04
+
+### Added
+- **Enterprise-first UX** — live Azure posture assessment as primary workflow
+- **Assess Security Posture** command — one-click connect → scan → grade → export
+- **Security posture grade (A–F)** with numeric score and color-coded circle
+- 26 Zero Trust security rules (NETSEC-001–026)
+- Application Gateway parsing — WAF detection, TLS version enforcement
+- Bastion Host and VPN Gateway parsing
+- WAF rules: no WAF (018), Detection-only mode (019), weak TLS (020)
+- Forced tunneling rule: subnet bypasses firewall (021)
+- VPN Gateway rules: Basic SKU (022), policy-based/legacy (023)
+- DDoS Protection for VNets (015), Bastion subnet check (016), PE DNS zones (017)
+- Welcome sidebar panel with "Get Started" view — Azure actions first
+- 9 resource types: VNet, NSG, RouteTable, PE, Firewall, AppGateway, Bastion, VPN Gateway, Peering
+- 99 unit tests across 4 suites
+- Concise README — 102 lines, enterprise-focused
+
+### Changed
+- Commands reordered: Connect → Assess → Visualize Live → Export → Bicep/ARM
+- Description updated to reflect Zero Trust posture assessment focus
+
 ## [0.1.0] — 2026-04-04
 
 ### Added
